@@ -2,15 +2,17 @@ import topo
 import route.route as rt
 import packet
 import numpy as np
+import random
 class simulation:
     lastTime = 100
     myTopo = None
     myRoute = None
     n = 0
+    stepPackets = 10    #每1ms一个node最多发多少包
     curTime = 0 
-    def __init__(self,_mat, _route, _lastTime) -> None:
-        self.n = len(_mat)
-        self.myTopo = topo.topo(self.n, _mat)
+    def __init__(self, _topo, _route, _lastTime) -> None:
+        self.myTopo = _topo
+        self.n = len(self.myTopo.mat)
         self.myRoute = _route
         self.lastTime = _lastTime
 
@@ -35,7 +37,13 @@ class simulation:
             self.deal(curNode)
         #每个节点定期发送包，这个怎么处理,最后1s就不发了，处理在流程中的包
         if self.curTime + 1000 < self.lastTime:
-            self.createPacket()
+            for id in range(0, self.n):
+                packetNum = random.randint(1, self.stepPackets)
+                for i in range(0, packetNum):
+                    dstID = random.randint(0, self.n - 1)
+                    if dstID == i:
+                        continue
+                    self.createPacket(self.myTopo.nodeList[id], self.myTopo.nodeList[dstID])
         self.update()           #更新所有组件
 
     def deal(self, curNode):

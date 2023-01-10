@@ -12,7 +12,7 @@ class topo:
         self.mat = _mat
         #初始化所有node
         for i in range(0, n):
-            self.nodeList[i] = node.node(i)
+            self.nodeList[i] = node.node(i, 100, 10)
         #初始化边以及对应连接关系,初始化链路信息
         for id1, neighborList in self.mat.items():
             for id2, edgeInfo in neighborList.items():
