@@ -12,24 +12,30 @@ class topo:
         self.mat = _mat
         #初始化所有node
         for i in range(0, n):
-            self.nodeList[i] = node.node(i, 100, 10)
+            curNode = node.node(i, 100, 10)
+            self.nodeList[i] = curNode
         #初始化边以及对应连接关系,初始化链路信息
         for id1, neighborList in self.mat.items():
             for id2, edgeInfo in neighborList.items():
                 node1 = self.nodeList[id1]
                 node2 = self.nodeList[id2]
-                curEdge = self.getEdge(node1, node2)
-                node1.setNeighbor(node2, curEdge, edgeInfo)
-                self.status[(node1.id, node2.id)] = linkInfo()
+                curEdge = self.getEdge(node1, node2, edgeInfo)
+                node1.setNeighbor(node2, curEdge)
+        
+        for id1 in range(0, n):
+            for id2 in range(0, n):
+                if id1 == id2:
+                    continue
+                self.status[(id1, id2)] = linkInfo()
 
     def getEdge(self, node1, node2, edgeInfo = None):
         '''
             获取相应的node,如果没有就新增一个
         '''
-        if self.edgeList.has_key((node1.id, node2.id)):
+        if (node1.id, node2.id) in self.edgeList:
             return self.edgeList[(node1.id, node2.id)]
-        elif self.edgeList.has_key((node2.id, node1.id)):
-            return self.edgeList[(node1.id, node2.id)]
+        elif (node2.id, node1.id) in self.edgeList:
+            return self.edgeList[(node2.id, node1.id)]
         else:
             self.edgeList[(node1.id, node2.id)] = edge.edge(edgeInfo.delay, edgeInfo.bandWidth, node1, node2)
             return self.edgeList[(node1.id, node2.id)]

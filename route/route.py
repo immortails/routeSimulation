@@ -4,7 +4,6 @@ class route:
     routeMap = {}   #二维的字典，通过routMap[org][dst]来查下一跳
     def __init__(self, _topo = None) -> None:
         self.topo = _topo
-        self.setMap()
         for i in range(0, len(self.topo.mat)):
             self.routeMap[i] = {}
 
@@ -18,7 +17,7 @@ class route:
         '''
             根据orgID 与 dstID 来查下一跳
         '''
-        return self.routeMap(orgID, dstID)
+        return self.routeMap[orgID][dstID]
 
 class dijstraRoute(route):
     '''
@@ -34,7 +33,7 @@ class dijstraRoute(route):
         for id1, nextList in mat.items():
             for id2, eInfo in nextList.items():
                 if G.has_edge(id1, id2) == False:
-                    G.add_weighted_edges_from(id1, id2, eInfo.delay)
+                    G.add_weighted_edges_from([(id1, id2, eInfo.delay)])
         path = dict(nx.all_pairs_dijkstra_path(G))
         for id1 in range(0, len(mat)):
             for id2 in range(0, len(mat)):

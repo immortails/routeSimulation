@@ -20,7 +20,7 @@ class simulation:
         '''
             仿真主流程
         '''
-        for i in range(0, self.allStep):
+        for i in range(0, self.lastTime):
             self.step()
         #仿真结束评估指标
         self.evolution()
@@ -41,8 +41,6 @@ class simulation:
                 packetNum = random.randint(1, self.stepPackets)
                 for i in range(0, packetNum):
                     dstID = random.randint(0, self.n - 1)
-                    if dstID == i:
-                        continue
                     self.createPacket(self.myTopo.nodeList[id], self.myTopo.nodeList[dstID])
         self.update()           #更新所有组件
 
@@ -56,6 +54,8 @@ class simulation:
                 break
             curPacket = curNode.packetQueue.get()
             #如果发送到目的地，收下来并记录
+            if curPacket.ttl == 0:
+                continue
             if curPacket.dst == curNode.id:
                 self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
             #发送给目的地
@@ -70,6 +70,8 @@ class simulation:
         '''
             从curNode创建一个包发送到dstNode
         '''
+        if curNode.id == dstNode.id:
+            return
         nextID = self.myRoute.next(curNode.id, dstNode.id)
         curPacket = packet.packet(curNode.id, dstNode.id, nextID, 64, self.curTime)
         curEdge = self.myTopo.getEdge(node1 = curNode, node2 = self.myTopo.nodeList[nextID])
@@ -92,6 +94,8 @@ class simulation:
         '''
         for id1, node1 in self.myTopo.nodeList.items():
             for id2, node2 in self.myTopo.nodeList.items():
+                if id1 == id2:
+                    continue
                 linkInfo = self.myTopo.status[(id1, id2)]
                 lossRate = 1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum
                 DelayAvg = np.mean(linkInfo.delayList)

@@ -13,18 +13,24 @@ class packet:
         self.next = _next
         self.ttl = _ttl
         self.orgTime = _orgTime
+    
     def delTTL(self):
         '''
             ttl每走一跳自然减少
         '''
         ttl -= 1
+    
     def changeNext(self, _next):
         '''
             下一跳的方向
         '''
         self.next = _next
+    
     def getOrgTime(self) -> int:
         '''
             用于获取这个包初始时间
         '''
         return self.orgTime
+
+    def __lt__(self, other):
+        return self.orgTime < other.orgTime

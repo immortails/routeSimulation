@@ -43,7 +43,8 @@ if __name__ == '__main__':
     }
     myTopo = topo.topo(len(mat), mat)
     myRoute = dijstraRoute(myTopo)
+    myRoute.setMap()
     lastTime = 10000
-    simulator = simulation(mat, myTopo, myRoute, lastTime)
+    simulator = simulation(myTopo, myRoute, lastTime)
     simulator.simulate()
     

@@ -6,11 +6,15 @@ class edge:
     curTime = 0         #当前仿真时间
     delay = 0           #链路时延
     bandWidth = 0        #1ms能传多少包
-    packetQueue = PriorityQueue()   #用于存放链路中包的队列，以时延为排序方式的优先队列，无大小限制
-    neighborNode = {}       #相邻两个node
+    packetQueue = None   #用于存放链路中包的队列，以时延为排序方式的优先队列，无大小限制
+    neighborNode = None       #相邻两个node
     curNum = 0
     def __init__(self, _delay, _bandWidth, _node1, _node2) -> None:
         self.delay = _delay
+        self.curTime = 0
+        self.packetQueue = PriorityQueue()
+        self.neighborNode = {}
+        self.curNum = 0
         self.bandWidth = _bandWidth
         self.neighborNode[_node1.id] = _node1
         self.neighborNode[_node2.id] = _node2
