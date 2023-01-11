@@ -1,3 +1,5 @@
+#coding=utf-8
+
 class packet:
     '''
         一个packet代表了1个包,一个包100B,仿真步长以ms为单位

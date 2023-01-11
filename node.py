@@ -1,5 +1,7 @@
-from queue import Queue
+#coding=utf-8
 
+from queue import Queue
+from collections import deque
 class node:
     '''
         这是node类
@@ -20,7 +22,7 @@ class node:
         self.capacity = _capacity
         self.bandWidth = _bandWidth
         self.neighbor = {}
-        self.packetQueue = Queue()
+        self.packetQueue = deque()
         self.curTime = 0
         self.size = 0
     def setNeighbor(self, node, edge):
@@ -34,7 +36,7 @@ class node:
         '''
         if self.size >= self.capacity:
             return            
-        self.packetQueue.put(packet)
+        self.packetQueue.append(packet)
         self.size += 1
 
     def update(self, _curTime):

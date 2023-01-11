@@ -1,3 +1,5 @@
+#coding=utf-8
+
 from queue import PriorityQueue
 class edge:
     '''
@@ -22,9 +24,13 @@ class edge:
         '''
             从node压入edge中
         '''
-        if self.curNum >= self.bandWidth:
+        if self.curNum > self.bandWidth:
             return
+        self.curNum += 1
         self.packetQueue.put([self.curTime + self.delay, packet])
+
+    def full(self):
+        return self.curNum > self.bandWidth
 
     def update(self, _curTime):
         '''
@@ -41,6 +47,9 @@ class edge:
             if self.packetQueue.empty():
                 break
             res = self.packetQueue.get()
+            if res[0] > self.curTime:
+                self.packetQueue.put(res)
+                break
             curPacket = res[1]
             nextNode = self.neighborNode[curPacket.next]
             nextNode.recv(curPacket)

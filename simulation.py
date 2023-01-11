@@ -1,3 +1,5 @@
+#coding=utf-8
+
 import topo
 import route.route as rt
 import packet
@@ -8,13 +10,14 @@ class simulation:
     myTopo = None
     myRoute = None
     n = 0
-    stepPackets = 10    #每1ms一个node最多发多少包
+    stepPackets = 20   #每1ms一个node最多发多少包
     curTime = 0 
-    def __init__(self, _topo, _route, _lastTime) -> None:
+    def __init__(self, _topo, _route, _lastTime, _stepPackets) -> None:
         self.myTopo = _topo
         self.n = len(self.myTopo.mat)
         self.myRoute = _route
         self.lastTime = _lastTime
+        self.stepPackets = _stepPackets
 
     def simulate(self):
         '''
@@ -50,19 +53,29 @@ class simulation:
         '''
         num = 0
         while num <= curNode.bandWidth:
-            if curNode.packetQueue.empty():
+            if len(curNode.packetQueue) == 0:
                 break
-            curPacket = curNode.packetQueue.get()
+            curPacket = curNode.packetQueue.popleft()
+            curNode.size -= 1
             #如果发送到目的地，收下来并记录
             if curPacket.ttl == 0:
                 continue
             if curPacket.dst == curNode.id:
+                if curPacket.org == 0 and curPacket.dst == 5:
+                    a = 1
                 self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
             #发送给目的地
             else:
                 num += 1
                 nextID = self.myRoute.next(curNode.id, curPacket.dst)
                 curEdge = self.myTopo.getEdge(node1 = curNode, node2 = self.myTopo.nodeList[nextID])
+                if curEdge.full():
+                    #这样处理属实是因为python中的deque没有访问元素的方式，必须要拿出来，真的离谱
+                    curNode.packetQueue.appendleft(curPacket)
+                    curNode.size += 1
+                    continue
+                curPacket.changeNext(nextID)
+                curPacket.ttl -= 1
                 curEdge.push(curPacket)
 
     
@@ -100,7 +113,7 @@ class simulation:
                 lossRate = 1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum
                 DelayAvg = np.mean(linkInfo.delayList)
                 DelayDev = np.var(linkInfo.delayList)
-                print("节点" + str(id1) + "到节点" + str(id2) + ": 丢包率: " + str(lossRate) + ", 平均时延: " + str(DelayAvg) + ", 平均时延方差: " + str(DelayDev))
+                print("node" + str(id1) + " to node" + str(id2) + ": lossRate: " + str(lossRate) + ", delay avg: " + str(DelayAvg) + ", delay dev: " + str(DelayDev))
 
 
 class edgeInfo:

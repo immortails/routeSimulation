@@ -1,3 +1,4 @@
+#coding=utf-8
 import edge
 import node
 class topo:
@@ -5,14 +6,18 @@ class topo:
     edgeList = {}       #topo的所有边
     mat = {}            #邻接表，给出边的具体信息
     status = {}         #记录(org, dst)的链路状态
-    def __init__(self, n, _mat) -> None:
+    nodeQueueCapacity = 10000       #包队列大小
+    nodeBandWidth = 10              #每1ms能处理多少个包
+    def __init__(self, n, _mat, _nodeQueueCapacity, _nodeBandWidth) -> None:
         '''
             n是节点个数
         '''
         self.mat = _mat
+        self.nodeBandWidth = _nodeBandWidth
+        self.nodeQueueCapacity = _nodeQueueCapacity
         #初始化所有node
         for i in range(0, n):
-            curNode = node.node(i, 100, 10)
+            curNode = node.node(i,self.nodeQueueCapacity, self.nodeBandWidth)
             self.nodeList[i] = curNode
         #初始化边以及对应连接关系,初始化链路信息
         for id1, neighborList in self.mat.items():
@@ -44,7 +49,7 @@ class linkInfo:
     delayList = []
     packageNum = 0
     def __init__(self) -> None:
-        pass
+        self.delayList = []
     def recvOK(self, delay = 0):
         self.delayList.append(delay)
     def sendOK(self):
