@@ -12,12 +12,14 @@ class simulation:
     n = 0
     stepPackets = 20   #每1ms一个node最多发多少包
     curTime = 0 
-    def __init__(self, _topo, _route, _lastTime, _stepPackets) -> None:
+    def __init__(self, _arg, _topo, _route) -> None:
+        self.arg = _arg
         self.myTopo = _topo
-        self.n = len(self.myTopo.mat)
         self.myRoute = _route
-        self.lastTime = _lastTime
-        self.stepPackets = _stepPackets
+        self.n = len(self.myTopo.mat)
+        self.lastTime = self.arg['lastTime']
+        self.stepPackets = self.arg['stepPackets']
+        self.curStatusInterval = self.arg['curStatusInterval']
 
     def simulate(self):
         '''
@@ -25,6 +27,8 @@ class simulation:
         '''
         for i in range(0, self.lastTime):
             self.step()
+            if i % self.curStatusInterval == 0:                #用于更新供模型reward的参数
+                self.myTopo.updateCurStatus()
         #仿真结束评估指标
         self.evolution()
 
@@ -61,9 +65,8 @@ class simulation:
             if curPacket.ttl == 0:
                 continue
             if curPacket.dst == curNode.id:
-                if curPacket.org == 0 and curPacket.dst == 5:
-                    a = 1
                 self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
+                self.myTopo.curStatus[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
             #发送给目的地
             else:
                 num += 1
@@ -90,10 +93,14 @@ class simulation:
         curEdge = self.myTopo.getEdge(node1 = curNode, node2 = self.myTopo.nodeList[nextID])
         curEdge.push(curPacket)
         self.myTopo.status[(curNode.id, dstNode.id)].sendOK()
-        
+        self.myTopo.curStatus[(curNode.id, dstNode.id)].sendOK()        
 
     def update(self):
+        '''
+            用于更新仿真时间
+        '''
         self.curTime += 1
+        self.myRoute.update(self.curTime)       #更新路由
         #更新每一条边
         for id, curEdge in self.myTopo.edgeList.items():
             curEdge.update(self.curTime)

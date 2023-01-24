@@ -5,13 +5,14 @@ class edge:
     '''
         描述链路
     '''
-    curTime = 0         #当前仿真时间
-    delay = 0           #链路时延
-    bandWidth = 0        #1ms能传多少包
-    packetQueue = None   #用于存放链路中包的队列，以时延为排序方式的优先队列，无大小限制
+    curTime = 0               #当前仿真时间
+    delay = 0                 #链路时延
+    bandWidth = 0             #1ms能传多少包
+    packetQueue = None        #用于存放链路中包的队列，以时延为排序方式的优先队列，无大小限制
     neighborNode = None       #相邻两个node
-    curNum = 0
-    def __init__(self, _delay, _bandWidth, _node1, _node2) -> None:
+    curNum = 0                #用于记录一个step内包的队列传输了多少包，以此来控制传输带宽
+    def __init__(self,_id, _delay, _bandWidth, _node1, _node2) -> None:
+        self.id = _id
         self.delay = _delay
         self.curTime = 0
         self.packetQueue = PriorityQueue()
