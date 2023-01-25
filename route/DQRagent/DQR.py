@@ -4,7 +4,7 @@ class FeatureNetwork(nn.Module):
     def __init__(self, modelArg) -> None:
         super().__init__()
         self.arg = modelArg
-        self.link_dim = self.arg['link_state_dim'] + 2             #加2是因为要补org和dst
+        self.link_dim = self.arg['link_state_dim']                  #加2是因为要补org和dst，后面不加2了，因为我把action也放进来了
         self.hidden1 = nn.Linear(self.link_dim, self.link_dim)
         self.hidden2 = nn.Linear(self.link_dim, self.link_dim)
         self.output = nn.Linear(self.link_dim, self.link_dim)
@@ -33,7 +33,7 @@ class DuelingNetwork(nn.module):
         super().__init__()
         self.arg = modelArg
         self.FeatureModel = FeatureNetwork(modelArg)
-        self.link_dim = self.arg['link_state_dim'] + 2
+        self.link_dim = self.arg['link_state_dim']
         self.hidden1 = nn.Linear(self.link_dim, self.link_dim)
         self.hidden2 = nn.Linear(self.link_dim, self.link_dim)
         self.output1 = nn.Linear(self.link_dim, self.arg['feature_num'])

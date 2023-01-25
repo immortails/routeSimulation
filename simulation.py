@@ -6,20 +6,15 @@ import packet
 import numpy as np
 import random
 class simulation:
-    lastTime = 100
-    myTopo = None
-    myRoute = None
-    n = 0
-    stepPackets = 20   #每1ms一个node最多发多少包
-    curTime = 0 
     def __init__(self, _arg, _topo, _route) -> None:
         self.arg = _arg
         self.myTopo = _topo
         self.myRoute = _route
-        self.n = len(self.myTopo.mat)
-        self.lastTime = self.arg['lastTime']
-        self.stepPackets = self.arg['stepPackets']
-        self.curStatusInterval = self.arg['curStatusInterval']
+        self.n = len(self.myTopo.mat)                                   #节点个数
+        self.lastTime = self.arg['lastTime']                            #仿真结束时间
+        self.stepPackets = self.arg['stepPackets']                      #每1ms一个node发多少包
+        self.curStatusInterval = self.arg['curStatusInterval']          #每隔多久重置一下当前时刻的链路状态
+        self.curTime = 0                                                #当前时间，计时使用 
 
     def simulate(self):
         '''

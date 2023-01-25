@@ -5,24 +5,17 @@ from collections import deque
 class node:
     '''
         这是node类
-    '''
-    id = 0                      #node对应的编号
-    packetQueue = None       #节点的队列
-    curTime = 0
-    capacity = 0
-    size = 0
-    bandWidth = 0               #链路带宽
-    neighbor = None               #节点相邻节点，需要给出对应的边和对应节点，以字典形式保存：key = id，value = [边类，节点类]
+    '''             
     def __init__(self, _id, _capacity = 100, _bandWidth = 100) -> None:
         '''
             初始化node, 需要传入相邻的节点以及对应的边,以一个字典的形式保存;还需传入相应的id
         '''
         #Python中，成员变量一定要在init里赋值
-        self.id = _id
-        self.capacity = _capacity
-        self.bandWidth = _bandWidth
-        self.neighbor = {}
-        self.packetQueue = deque()
+        self.id = _id                                   #node对应的编号
+        self.capacity = _capacity                       #节点容量
+        self.bandWidth = _bandWidth                     #链路带宽
+        self.neighbor = {}                              #节点相邻节点，需要给出对应的边和对应节点，以字典形式保存：key = id，value = [边类，节点类]
+        self.packetQueue = deque()                      #节点的队列
         self.curTime = 0
         self.size = 0
     def setNeighbor(self, node, edge):

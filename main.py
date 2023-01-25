@@ -10,7 +10,7 @@ stepPackets = 10            #每次随机生成包数量
 nodeQueueCapacity = 10000   #节点队列容量
 nodeBandWidth = 10          #节点1次可以处理多少个包
 curInterval = 60            #计算当前时刻链路状态的间隔
-
+linkStateDim = 25           #链路状态的Dim
 if __name__ == '__main__':
     #传入的mat是一个领接表，元素有两项，一项是node，一项是边
     mat = {
@@ -50,7 +50,7 @@ if __name__ == '__main__':
             },
     }
 
-    myTopo = topo.topo(len(mat), mat, nodeQueueCapacity, nodeBandWidth)
+    myTopo = topo.topo(len(mat), mat, nodeQueueCapacity, nodeBandWidth, linkStateDim)
     myRoute = dijstraRoute(myTopo)
     myRoute.setMap()
     simulationArg = {

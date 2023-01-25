@@ -1,26 +1,25 @@
 #coding=utf-8
 import edge
 import node
-class topo:
-    nodeList = {}       #topo的所有节点
-    edgeList = {}       #topo的所有边
-    mat = {}            #邻接表，给出边的具体信息
-    status = {}         #记录(org, dst)的总的链路状态
-    curStatus = {}      #记录当前时刻的链路状态，用于算法评估环境的。
-    nodeQueueCapacity = 10000       #包队列大小
-    nodeBandWidth = 10              #每1ms能处理多少个包
-    num = 0                         #节点个数
-    reward = 0                   #计算当前拓扑的reward
-    def __init__(self, n, _mat, _nodeQueueCapacity, _nodeBandWidth) -> None:
+import numpy as np
+import networkx as nx
+class topo:                 
+    def __init__(self, n, _mat, _nodeQueueCapacity, _nodeBandWidth, _linkStateDim) -> None:
         '''
             n是节点个数
         '''
-        self.mat = _mat
-        self.nodeBandWidth = _nodeBandWidth
-        self.nodeQueueCapacity = _nodeQueueCapacity
+        self.mat = _mat                                                             #邻接表，给出边的具体信息
+        self.nodeBandWidth = _nodeBandWidth                                         #每1ms能处理多少个包
+        self.nodeQueueCapacity = _nodeQueueCapacity                                 #包队列大小
         self.edgeID = 0
-        self.num = n  
-        self.reward = 0 
+        self.num = n                                                                #节点个数
+        self.reward = 0                                                             #计算当前拓扑的reward
+        self.curStatus = {}                                                         #记录当前时刻的链路状态，用于算法评估环境的。
+        self.status = {}                                                            #记录(org, dst)的总的链路状态
+        self.nodeList = {}                                                          #topo的所有节点
+        self.edgeList = {}                                                          #topo的所有边
+        self.LinkStateMat = np.zeros((len(self.edgeList), _linkStateDim))        #提供所有链路的特征矩阵  
+
         #初始化所有node
         for i in range(0, n):
             curNode = node.node(i, self.nodeQueueCapacity, self.nodeBandWidth)
@@ -39,6 +38,9 @@ class topo:
                     continue
                 self.status[(id1, id2)] = linkInfo()
                 self.curStatus[(id1, id2)] = linkInfo()
+
+        #初始化链路状态矩阵
+        self.initLinkState()         
 
     def getEdge(self, node1, node2, edgeInfo = None):
         '''
@@ -60,11 +62,47 @@ class topo:
                     continue
                 #todo：这里缺一个更新指标的东西，reward没想好怎么写
                 self.cauReward()
+                self.updateLinkState()
                 self.curStatus[(id1, id2)].clear()
     
     def cauReward(self):
         #计算reward的函数，这里算出来的是绝对reward，实际使用时候应用相对的reward
         pass     
+
+    def updateLinkState(self):
+        #更新linkstate的矩阵，主要是更新链路容量这个参数
+        pass
+
+    def initLinkState(self):
+        #初始化链路状态矩阵的函数
+        #x1是link Capacity, x2是degree centrality, x3是link Betweennes centrality, x4是是否选取， x5是顺序, init这里只初始化x1,2,3
+        n = len(self.edgeList)
+        #赋值x1
+        for ids, link in self.edgeList.items():
+            self.LinkStateMat[link.id][0] = float(link.curNum) / link.bandWidth
+        #degree centrality
+        G = nx.Graph()
+        for id in range(0, n):
+            G.add_node(id)
+        for ids, link in self.edgeList.items():
+            edgeID = link.id
+            curNode1 = link.neighborNode[ids[0]]
+            curNode2 = link.neighborNode[ids[1]]
+            for neighborID, info in curNode1.neighbor.items():
+                neighborEdge = info[0]
+                if link.id == neighborEdge.id:
+                    continue
+                if G.has_edge(link.id, neighborEdge.id) == False:
+                    G.add_weighted_edges_from([(link.id, neighborEdge.id, 1)])
+            for neighborID, info in curNode2.neighbor.items():
+                neighborEdge = info[0]
+                if link.id == neighborEdge.id:
+                    continue
+                if G.has_edge(link.id, neighborEdge.id) == False:
+                    G.add_weighted_edges_from([(link.id, neighborEdge.id, 1)])
+            allDegree = nx.degree_centrality(G)
+            for id, degree in allDegree.items():
+                self.LinkStateMat[id][1] = degree
 
 class linkInfo:
     '''

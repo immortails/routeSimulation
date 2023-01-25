@@ -10,6 +10,7 @@ class route:
         self.routeMap = {}   #二维的字典，通过routMap[org][dst]来查下一跳
         self.routeLife = {}  #二维的字典，用于确定路由的生命周期  
         self.curTime = 0     #当前仿真时刻，用于判断路由是否过期
+        self.oneLife = 100   #单条路由生命周期
         for i in range(0, len(self.topo.mat)):
             self.routeMap[i] = {}
             self.routeLife[i] = {}
@@ -72,7 +73,7 @@ class DQRroute(route):
             'link_connection': self.createLinkConn(self.topo.edgeList),
             'feature_num': 4,
         }
-        self.agent = agent(self.arg)     
+        self.agent = agent(self.arg)   
         #初始化ksp查询的字典
         self.kspMap = {}
         n = len(self.topo.mat)
@@ -128,11 +129,12 @@ class DQRroute(route):
             action = self.agent.chooseAction(self.topo, orgID, dstID)
         path = self.kspMap[orgID][dstID][action]
         preID = -1
-        for nextID in path[1: len(path) - 1]:
+        for nextID in path[: -1]:
             if preID == -1:
                 continue
             self.routeMap[preID][dstID] = nextID
             preID = nextID
+        self.routeLife[orgID][dstID] = self.curTime + self.oneLife + random.randint(0, 10)
         return self.routeMap[orgID][dstID] 
         
 
