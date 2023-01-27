@@ -40,7 +40,7 @@ class simulation:
         #每个节点定期发送包，这个怎么处理,最后1s就不发了，处理在流程中的包
         if self.curTime + 1000 < self.lastTime:
             for id in range(0, self.n):
-                packetNum = random.randint(1, self.stepPackets)
+                packetNum = random.randint(0, self.stepPackets)
                 for i in range(0, packetNum):
                     dstID = random.randint(0, self.n - 1)
                     self.createPacket(self.myTopo.nodeList[id], self.myTopo.nodeList[dstID])

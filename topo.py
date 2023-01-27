@@ -56,6 +56,9 @@ class topo:
             return self.edgeList[(node1.id, node2.id)]
 
     def updateCurStatus(self):
+        '''
+            用于定时更新拓扑状态,目前该函数主要供强化学习使用
+        '''
         for id1 in range(0, self.num):
             for id2 in range(0, self.num):
                 if id1 == id2:
@@ -71,11 +74,12 @@ class topo:
 
     def updateLinkState(self):
         #更新linkstate的矩阵，主要是更新链路容量这个参数
-        pass
+        for ids, link in self.edgeList.items():
+            self.LinkStateMat[link.id][0] = float(link.curNum) / link.bandWidth
 
     def initLinkState(self):
         #初始化链路状态矩阵的函数
-        #x1是link Capacity, x2是degree centrality, x3是link Betweennes centrality, x4是是否选取， x5是顺序, init这里只初始化x1,2,3
+        #x1是link Capacity, x2是degree centrality, x3是link Betweenness centrality, x4是是否选取， x5是顺序, init这里只初始化x1,2,3
         n = len(self.edgeList)
         #赋值x1
         for ids, link in self.edgeList.items():
@@ -103,6 +107,18 @@ class topo:
             allDegree = nx.degree_centrality(G)
             for id, degree in allDegree.items():
                 self.LinkStateMat[id][1] = degree
+        #link betweenness centrality
+        G1 = nx.Graph()
+        for id in range(0, len(self.mat)):
+            G1.add_node(id)
+        for id1, nextList in self.mat.items():
+            for id2, eInfo in nextList.items():
+                if G1.has_edge(id1, id2) == False:
+                    G1.add_weighted_edges_from([(id1, id2, eInfo.delay)])
+        allBetweenness = nx.edge_betweenness_centrality(G)
+        for ids, betweenness in allBetweenness.items():
+            curLink = self.getEdge(ids[0], ids[1])
+            self.LinkStateMat[curLink.id][2] = betweenness
 
 class linkInfo:
     '''

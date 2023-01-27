@@ -14,15 +14,7 @@ class route:
         for i in range(0, len(self.topo.mat)):
             self.routeMap[i] = {}
             self.routeLife[i] = {}
-        #构建路由算法使用的networkx
-        self.G = nx.Graph()
-        mat = self.topo.mat
-        for id in range(0, len(mat)):
-            self.G.add_node(id)
-        for id1, nextList in mat.items():
-            for id2, eInfo in nextList.items():
-                if self.G.has_edge(id1, id2) == False:
-                    self.G.add_weighted_edges_from([(id1, id2, eInfo.delay)])
+
 
     def setMap(self):
         '''
@@ -50,8 +42,18 @@ class dijstraRoute(route):
         super().__init__(_topo)
 
     def setMap(self):
+        #构建路由算法使用的networkx
+        G = nx.Graph()
+        mat = self.topo.mat
+        for id in range(0, len(mat)):
+            self.G.add_node(id)
+        for id1, nextList in mat.items():
+            for id2, eInfo in nextList.items():
+                if G.has_edge(id1, id2) == False:
+                    G.add_weighted_edges_from([(id1, id2, eInfo.delay)])
+
         n = len(self.topo.mat)
-        path = dict(nx.all_pairs_dijkstra_path(self.G))
+        path = dict(nx.all_pairs_dijkstra_path(G))
         for id1 in range(0, n):
             for id2 in range(0, n):
                 if id1 == id2:
@@ -64,7 +66,7 @@ class DQRroute(route):
     '''
     def __init__(self, _topo=None) -> None:
         super().__init__(_topo)
-        self.actionNum = 4              #action space的空间大小
+        self.actionSpace = 4              #action space的空间大小
         self.arg = {
             'T' : 20,
             'link_state_dim': 25,
@@ -73,7 +75,6 @@ class DQRroute(route):
             'link_connection': self.createLinkConn(self.topo.edgeList),
             'feature_num': 4,
         }
-        self.agent = agent(self.arg)   
         #初始化ksp查询的字典
         self.kspMap = {}
         n = len(self.topo.mat)
@@ -82,6 +83,7 @@ class DQRroute(route):
         for id1 in range(0, n):
             for id2 in range(0, n):
                 self.kspMap[id1][id2] = []      
+        self.agent = agent(self.arg, self.topo, self.kspMap)   
 
     def createLinkConn(self, edgeList):
         '''
@@ -113,7 +115,7 @@ class DQRroute(route):
                 kPaths = nx.all_shortest_paths(self.G, id1, id2)
                 cnt = 0
                 for path in kPaths:
-                    if cnt > self.actionNum:
+                    if cnt > self.actionSpace:
                         break
                     self.kspMap[id1][id2].append(path)
                     cnt += 1
@@ -125,7 +127,7 @@ class DQRroute(route):
         #路由过期
         n = len(self.kspMap[orgID][dstID])
         action = random.randint(0, n - 1)
-        if n == self.actionNum:
+        if n == self.actionSpace:
             action = self.agent.chooseAction(self.topo, orgID, dstID)
         path = self.kspMap[orgID][dstID][action]
         preID = -1
