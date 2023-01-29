@@ -5,12 +5,13 @@ from DQRagent.agent import agent
 import random
 class route:
     topo = None                     
-    def __init__(self, _topo = None) -> None:
+    def __init__(self, _topo = None, _arg = None) -> None:
         self.topo = _topo
+        self.arg = _arg
         self.routeMap = {}   #二维的字典，通过routMap[org][dst]来查下一跳
         self.routeLife = {}  #二维的字典，用于确定路由的生命周期  
         self.curTime = 0     #当前仿真时刻，用于判断路由是否过期
-        self.oneLife = 100   #单条路由生命周期
+        self.oneLife = self.arg['oneLife']   #单条路由生命周期
         for i in range(0, len(self.topo.mat)):
             self.routeMap[i] = {}
             self.routeLife[i] = {}
@@ -38,8 +39,8 @@ class dijstraRoute(route):
     '''
         用最短路径生成的路由表
     '''
-    def __init__(self, _topo=None) -> None:
-        super().__init__(_topo)
+    def __init__(self, _topo=None, _arg = None) -> None:
+        super().__init__(_topo, _arg)
 
     def setMap(self):
         #构建路由算法使用的networkx
@@ -64,16 +65,24 @@ class DQRroute(route):
     '''
         基于强化学习的路由策略
     '''
-    def __init__(self, _topo=None) -> None:
-        super().__init__(_topo)
+    def __init__(self, _topo=None, _arg = None) -> None:
+        super().__init__(_topo, _arg)
         self.actionSpace = 4              #action space的空间大小
-        self.arg = {
+        self.modelArg = {
             'T' : 20,
             'link_state_dim': 25,
             'node_num': len(self.topo.nodeList),
             'edge_num': len(self.topo.edgeList),
             'link_connection': self.createLinkConn(self.topo.edgeList),
             'feature_num': 4,
+            'beta' : 0.5,
+        }
+        self.agentArg = {
+            'modelArg' : self.modelArg,
+            'ifUpdate' : True,
+            'actionSpace' : self.actionSpace,
+            'learnRate' : 0.001,
+            'expQueueLength': 100,
         }
         #初始化ksp查询的字典
         self.kspMap = {}
@@ -83,7 +92,7 @@ class DQRroute(route):
         for id1 in range(0, n):
             for id2 in range(0, n):
                 self.kspMap[id1][id2] = []      
-        self.agent = agent(self.arg, self.topo, self.kspMap)   
+        self.agent = agent(self.agentArg, self.topo, self.kspMap)   
 
     def createLinkConn(self, edgeList):
         '''

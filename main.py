@@ -51,12 +51,16 @@ if __name__ == '__main__':
     }
 
     myTopo = topo.topo(len(mat), mat, nodeQueueCapacity, nodeBandWidth, linkStateDim)
-    myRoute = dijstraRoute(myTopo)
+    routeArg = {
+        "oneLife" : 100,
+    }
+    myRoute = dijstraRoute(myTopo, routeArg)
     myRoute.setMap()
     simulationArg = {
         'lastTime': lastTime,
         'stepPackets': stepPackets,
         'curStatusInterval': curInterval,
+        'DQN' : False
     }
     simulator = simulation(simulationArg, myTopo, myRoute)
     simulator.simulate()

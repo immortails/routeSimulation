@@ -70,7 +70,24 @@ class topo:
     
     def cauReward(self):
         #计算reward的函数，这里算出来的是绝对reward，实际使用时候应用相对的reward
-        pass     
+        #时延，时延抖动，丢包率
+        delay = 0
+        delayDev = 0
+        lossRate = 0
+        n = 0
+        a = 1
+        b = 10
+        c = 100
+        for id1, node1 in self.nodeList.items():
+            for id2, node2 in self.nodeList.items():
+                if id1 == id2:
+                    continue
+                n += 1
+                linkInfo = self.curStatus[(id1, id2)]
+                lossRate += 1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum
+                DelayAvg += np.mean(linkInfo.delayList)
+                DelayDev += np.var(linkInfo.delayList)
+        self.reward = a * float(delay) / n + b * float(delayDev) / n + c * float(lossRate) / n
 
     def updateLinkState(self):
         #更新linkstate的矩阵，主要是更新链路容量这个参数

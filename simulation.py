@@ -22,8 +22,10 @@ class simulation:
         '''
         for i in range(0, self.lastTime):
             self.step()
-            if i % self.curStatusInterval == 0:                #用于更新供模型reward的参数
+            if i % self.curStatusInterval == 0:                         #用于更新供模型reward的参数
                 self.myTopo.updateCurStatus()
+            if self.arg['DQN'] and i % 1000 == 0:                       #保存模型参数
+                self.myRoute.agent.savePara()
         #仿真结束评估指标
         self.evolution()
 
