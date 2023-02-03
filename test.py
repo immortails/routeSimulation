@@ -1,6 +1,8 @@
 import networkx as nx
 import numpy as np
-a = np.array([1.0, 2.0, 3.0])
-b = a / sum(a)
-c = np.random.choice(a = a, p = b)
-print(c)
+G = nx.Graph()
+nx.add_path(G, [0, 1, 2])
+nx.add_path(G, [0, 10, 2])
+a = nx.all_shortest_paths(G, source=0, target=2)
+for p in a:
+    print(p)

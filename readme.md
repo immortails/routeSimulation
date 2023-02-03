@@ -6,8 +6,8 @@
 - 框架已使用经验队列，后序还要加入target network来提高
 - 已实现基础价值学习部分，后序准备用duling network来改进价值学习；以及用actor critic方法来学习
 #### todo
-- 神经网络update部分
-- reward部分
+- 神经网络update部分(已完成)
+- reward部分(已完成)
 - target network
 - duling network
 - actor critic

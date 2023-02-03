@@ -1,7 +1,7 @@
 #coding=utf-8
 import networkx as nx
 import numpy as np
-from DQRagent.agent import agent
+from route.rlagent.agent import agent
 import random
 class route:
     topo = None                     
@@ -47,7 +47,7 @@ class dijstraRoute(route):
         G = nx.Graph()
         mat = self.topo.mat
         for id in range(0, len(mat)):
-            self.G.add_node(id)
+            G.add_node(id)
         for id1, nextList in mat.items():
             for id2, eInfo in nextList.items():
                 if G.has_edge(id1, id2) == False:
@@ -74,8 +74,7 @@ class DQRroute(route):
             'node_num': len(self.topo.nodeList),
             'edge_num': len(self.topo.edgeList),
             'link_connection': self.createLinkConn(self.topo.edgeList),
-            'feature_num': 4,
-            'beta' : 0.5,
+            'feature_num': self.actionSpace,
         }
         self.agentArg = {
             'modelArg' : self.modelArg,
@@ -83,6 +82,7 @@ class DQRroute(route):
             'actionSpace' : self.actionSpace,
             'learnRate' : 0.001,
             'expQueueLength': 100,
+            'beta': 0.5,
         }
         #初始化ksp查询的字典
         self.kspMap = {}
@@ -113,20 +113,32 @@ class DQRroute(route):
                 if curEdge.id == neighborEdge.id:
                     continue
                 linkMat[curEdge.id][neighborEdge.id] = 1     
+        return linkMat
 
     def setMap(self):
         '''
             这里用于计算所有节点的ksp吧
         '''
+        G = nx.Graph()
+        mat = self.topo.mat
+        for id in range(0, len(mat)):
+            G.add_node(id)
+        for id1, nextList in mat.items():
+            for id2, eInfo in nextList.items():
+                if G.has_edge(id1, id2) == False:
+                    G.add_weighted_edges_from([(id1, id2, eInfo.delay)])
+
         n = len(self.topo.mat)
         for id1 in range(0, n):
             for id2 in range(0, n):
-                kPaths = nx.all_shortest_paths(self.G, id1, id2)
+                if id1 == id2:
+                    continue
+                kPaths = nx.all_shortest_paths(G, source = id1, target = id2)
                 cnt = 0
                 for path in kPaths:
-                    if cnt > self.actionSpace:
+                    if cnt >= self.actionSpace:
                         break
-                    self.kspMap[id1][id2].append(path)
+                    self.kspMap[id1][id2].append(path[:])
                     cnt += 1
 
     def next(self, orgID, dstID):
@@ -137,15 +149,17 @@ class DQRroute(route):
         n = len(self.kspMap[orgID][dstID])
         action = random.randint(0, n - 1)
         if n == self.actionSpace:
-            action = self.agent.chooseAction(self.topo, orgID, dstID)
+            action = self.agent.chooseAction(orgID, dstID)
         path = self.kspMap[orgID][dstID][action]
         preID = -1
-        for nextID in path[: -1]:
+        curLife = self.curTime + self.oneLife + random.randint(0, 10)
+        for nextID in path:
             if preID == -1:
+                preID = nextID
                 continue
             self.routeMap[preID][dstID] = nextID
+            self.routeLife[preID][dstID] = curLife
             preID = nextID
-        self.routeLife[orgID][dstID] = self.curTime + self.oneLife + random.randint(0, 10)
         return self.routeMap[orgID][dstID] 
         
 

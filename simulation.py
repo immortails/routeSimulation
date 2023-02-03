@@ -20,14 +20,15 @@ class simulation:
         '''
             仿真主流程
         '''
-        for i in range(0, self.lastTime):
+        for i in range(1, self.lastTime):
             self.step()
             if i % self.curStatusInterval == 0:                         #用于更新供模型reward的参数
                 self.myTopo.updateCurStatus()
+                #self.myRoute.agent.updateReward(self.myTopo.reward)
             if self.arg['DQN'] and i % 1000 == 0:                       #保存模型参数
                 self.myRoute.agent.savePara()
-        #仿真结束评估指标
-        self.evolution()
+                print("cur step:" + str(i) + " cur reward: " + str(self.myTopo.reward))
+        self.evolution()                                                #评估指标
 
     def step(self):
         '''
@@ -64,6 +65,7 @@ class simulation:
             if curPacket.dst == curNode.id:
                 self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
                 self.myTopo.curStatus[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
+                continue
             #发送给目的地
             else:
                 num += 1
@@ -98,6 +100,7 @@ class simulation:
         '''
         self.curTime += 1
         self.myRoute.update(self.curTime)       #更新路由
+        self.myTopo.update(self.curTime)
         #更新每一条边
         for id, curEdge in self.myTopo.edgeList.items():
             curEdge.update(self.curTime)
@@ -109,6 +112,7 @@ class simulation:
         '''
             评价拓扑指标
         '''
+        print("当前仿真步长" + str(self.curTime))
         for id1, node1 in self.myTopo.nodeList.items():
             for id2, node2 in self.myTopo.nodeList.items():
                 if id1 == id2:

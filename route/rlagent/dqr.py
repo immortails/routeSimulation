@@ -1,5 +1,6 @@
 from torch import nn
 import torch
+import numpy as np
 class FeatureNetwork(nn.Module):
     '''
         nodeList暂时废弃
@@ -13,9 +14,10 @@ class FeatureNetwork(nn.Module):
         self.output = nn.Linear(self.link_dim, self.link_dim)
         self.sigmoid = nn.Sigmoid()
         self.gru = nn.GRU(self.link_dim, self.link_dim, 1)
-        self.idx_mat = torch.from_numpy(self.idxMat(self.arg['link_connection']))
+        self.idx_mat = torch.from_numpy(self.arg['link_connection'].astype(np.float32))
 
     def forward(self, inputList):                         #inputList 是特征矩阵,   nodeList是org与dst,这块要先norm一下(nodeList废弃)
+        inputList = inputList.astype(np.float32)
         linkState = torch.from_numpy(inputList)
         #linkState = torch.cat((nodeList, linkState), 1)             #先和org 和 dst 拼一下
         #message passing
@@ -27,11 +29,15 @@ class FeatureNetwork(nn.Module):
             midList = self.output(midList)
             midList = self.sigmoid(midList)
             midList = torch.mm(self.idx_mat, midList)               #相邻的特征累加其实就是一个矩阵乘法，就是几个特征向量的线性变换。
-            midList = self.gru([midList], [linkState])
-            linkState = midList[0]
+            midList = torch.unsqueeze(midList, 0)
+            linkState = torch.unsqueeze(linkState, 0)
+            #midList.reshape(1, len(midList), len(midList[0]))
+            #linkState.reshape(1, len(linkState), len(linkState[0]))
+            midList = self.gru(midList, linkState)
+            linkState = linkState[0]
             return linkState
 
-class ValueNetwork(nn.model):
+class ValueNetwork(nn.Module):
     def __init__(self, modelArg) -> None:
         super().__init__()
         self.arg = modelArg
@@ -45,7 +51,7 @@ class ValueNetwork(nn.model):
     def forward(self, inputList):
         #提取特征
         linkState = self.FeatureModel(inputList)
-        feature = torch.sum(linkState, 1)
+        feature = torch.sum(linkState, 0)
         #Qpi函数
         value = self.hidden1(feature)
         value = self.sigmoid(value)
@@ -54,7 +60,7 @@ class ValueNetwork(nn.model):
         value = self.output1(value)
         return value
 
-class DuelingNetwork(nn.module):
+class DuelingNetwork(nn.Module):
     '''
         写的有问题,要大改
     '''

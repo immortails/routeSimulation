@@ -15,11 +15,11 @@ class topo:
         self.num = n                                                                #节点个数
         self.reward = 0                                                             #计算当前拓扑的reward
         self.curStatus = {}                                                         #记录当前时刻的链路状态，用于算法评估环境的。
+        self.lastcurStatusTime = 0                                                  #处理curStatus 接收到上一个周期的包的问题
         self.status = {}                                                            #记录(org, dst)的总的链路状态
         self.nodeList = {}                                                          #topo的所有节点
         self.edgeList = {}                                                          #topo的所有边
-        self.LinkStateMat = np.zeros((len(self.edgeList), _linkStateDim))        #提供所有链路的特征矩阵  
-
+        self.curTime = 0                                                            #当前仿真时间
         #初始化所有node
         for i in range(0, n):
             curNode = node.node(i, self.nodeQueueCapacity, self.nodeBandWidth)
@@ -40,6 +40,7 @@ class topo:
                 self.curStatus[(id1, id2)] = linkInfo()
 
         #初始化链路状态矩阵
+        self.LinkStateMat = np.zeros((len(self.edgeList), _linkStateDim))        #提供所有链路的特征矩阵  
         self.initLinkState()         
 
     def getEdge(self, node1, node2, edgeInfo = None):
@@ -59,35 +60,41 @@ class topo:
         '''
             用于定时更新拓扑状态,目前该函数主要供强化学习使用
         '''
+        self.cauReward()
         for id1 in range(0, self.num):
             for id2 in range(0, self.num):
                 if id1 == id2:
                     continue
                 #todo：这里缺一个更新指标的东西，reward没想好怎么写
-                self.cauReward()
                 self.updateLinkState()
                 self.curStatus[(id1, id2)].clear()
+        self.lastcurStatusTime = self.curTime
     
     def cauReward(self):
         #计算reward的函数，这里算出来的是绝对reward，实际使用时候应用相对的reward
         #时延，时延抖动，丢包率
-        delay = 0
-        delayDev = 0
+        DelayAvg = 0
+        DelayDev = 0
         lossRate = 0
         n = 0
-        a = 1
-        b = 10
-        c = 100
+        a = 1.0
+        b = 10.0
+        c = 100.0
         for id1, node1 in self.nodeList.items():
             for id2, node2 in self.nodeList.items():
                 if id1 == id2:
                     continue
-                n += 1
                 linkInfo = self.curStatus[(id1, id2)]
-                lossRate += 1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum
-                DelayAvg += np.mean(linkInfo.delayList)
-                DelayDev += np.var(linkInfo.delayList)
-        self.reward = a * float(delay) / n + b * float(delayDev) / n + c * float(lossRate) / n
+                if linkInfo.packageNum == 0:
+                    continue
+                n += 1
+                lossRate += max(1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum, 0)
+                if len(linkInfo.delayList) != 0:
+                    DelayAvg += np.mean(linkInfo.delayList)
+                    DelayDev += np.var(linkInfo.delayList)
+        if n == 0:
+            return
+        self.reward = a * float(DelayAvg) / n + b * float(DelayDev) / n + c * float(lossRate) / n
 
     def updateLinkState(self):
         #更新linkstate的矩阵，主要是更新链路容量这个参数
@@ -132,24 +139,28 @@ class topo:
             for id2, eInfo in nextList.items():
                 if G1.has_edge(id1, id2) == False:
                     G1.add_weighted_edges_from([(id1, id2, eInfo.delay)])
-        allBetweenness = nx.edge_betweenness_centrality(G)
+        allBetweenness = nx.edge_betweenness_centrality(G1)
         for ids, betweenness in allBetweenness.items():
-            curLink = self.getEdge(ids[0], ids[1])
+            curLink = self.getEdge(self.nodeList[ids[0]], self.nodeList[ids[1]])
             self.LinkStateMat[curLink.id][2] = betweenness
+
+    def update(self, _time):
+        '''
+            用于更新时间
+        '''
+        self.curTime = _time
 
 class linkInfo:
     '''
         记录链路状态信息
-    '''
-    delayList = []              #存储有效的收包时延时间
-    packageNum = 0              #总的发包个数
+    '''           
     def __init__(self) -> None:
-        self.delayList = []
-        self.packageNum = 0
+        self.delayList = []             #存储有效的收包时延时间
+        self.packageNum = 0             #总的发包个数
     def recvOK(self, delay = 0):
         self.delayList.append(delay)
     def sendOK(self):
         self.packageNum += 1
     def clear(self):
         self.packageNum = 0
-        self.delayList.clear()
+        self.delayList = []
