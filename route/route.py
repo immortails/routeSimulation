@@ -81,8 +81,9 @@ class DQRroute(route):
             'ifUpdate' : True,
             'actionSpace' : self.actionSpace,
             'learnRate' : 0.001,
-            'expQueueLength': 100,
+            'expQueueLength': 1000,
             'beta': 0.5,
+            'gamma': 0.95,
         }
         #初始化ksp查询的字典
         self.kspMap = {}
@@ -148,7 +149,8 @@ class DQRroute(route):
         #路由过期
         n = len(self.kspMap[orgID][dstID])
         action = random.randint(0, n - 1)
-        if n == self.actionSpace:
+        #加入一点随机性在里面
+        if random.randint(0, 100) < 95 and n == self.actionSpace:
             action = self.agent.chooseAction(orgID, dstID)
         path = self.kspMap[orgID][dstID][action]
         preID = -1

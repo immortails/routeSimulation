@@ -9,9 +9,10 @@ class FeatureNetwork(nn.Module):
         super().__init__()
         self.arg = modelArg
         self.link_dim = self.arg['link_state_dim']                  #加2是因为要补org和dst，后面不加2了，因为我把action也放进来了
-        self.hidden1 = nn.Linear(self.link_dim, self.link_dim)
-        self.hidden2 = nn.Linear(self.link_dim, self.link_dim)
-        self.output = nn.Linear(self.link_dim, self.link_dim)
+        self.hidden_dim = 1000
+        self.hidden1 = nn.Linear(self.link_dim, self.hidden_dim)
+        self.hidden2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.output = nn.Linear(self.hidden_dim, self.link_dim)
         self.sigmoid = nn.Sigmoid()
         self.gru = nn.GRU(self.link_dim, self.link_dim, 1)
         self.idx_mat = torch.from_numpy(self.arg['link_connection'].astype(np.float32))
@@ -43,9 +44,10 @@ class ValueNetwork(nn.Module):
         self.arg = modelArg
         self.FeatureModel = FeatureNetwork(modelArg)
         self.link_dim = self.arg['link_state_dim']
-        self.hidden1 = nn.Linear(self.link_dim, self.link_dim)
-        self.hidden2 = nn.Linear(self.link_dim, self.link_dim)
-        self.output1 = nn.Linear(self.link_dim, 1)
+        self.hidden_dim = 1000
+        self.hidden1 = nn.Linear(self.link_dim, self.hidden_dim)
+        self.hidden2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.output1 = nn.Linear(self.hidden_dim, 1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, inputList):
@@ -96,5 +98,5 @@ class DuelingNetwork(nn.Module):
         valueState = self.output2(valueState)
         #最终输出actionState函数
         res = valueState - torch.max(advantage)
-        res = self.sigmoid(res)
+        res = self.sigmoid(res) * 10
         return res

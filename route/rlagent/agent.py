@@ -3,20 +3,26 @@ import numpy as np
 from torch import nn
 import torch
 import os
+import random
 class agent:
     def __init__(self, _arg, _topo, _kspMap) -> None:
         '''
-            arg 参数包括 ifUpdate, modelArg, actionSpace, learnRate, expQueueLength, beta
+            arg 参数包括 ifUpdate, modelArg, actionSpace, learnRate, expQueueLength, beta, gamma
         '''
         self.arg = _arg                                                                             #agent 所需要的一系列参数
         self.topo = _topo                                                                           #网络拓扑
         self.kspMap = _kspMap                                                                       #预计算的ksp路径
         self.lastReward = {}                                                                        #用于计算reward
         self.expQueue = []                                                                          #经验回放队列
+        self.lossData = []                                                                          #记录loss的日志
         self.DQNnetwork = dqr.ValueNetwork(self.arg['modelArg'])                                    #神经网络
         self.optimizer = torch.optim.Adam(self.DQNnetwork.parameters(), lr=self.arg['learnRate'])   #优化器
         self.lossFunc = nn.MSELoss()                                                                #损失函数
-        self.QstarValueMat = {}                                                                     #用于保存上一次计算的reward，方便训练
+        self.QstarValueMat = {}                                                                     #用于保存上一次计算的actionState，方便训练
+        self.updateTime = 0                                                                         #用于记录迭代次数
+        self.rewardData = []                                                                        #用于记录reward
+        self.lastPackets = np.zeros((len(self.topo.nodeList), len(self.topo.nodeList)))             #用于记录上一次的总packet
+        self.lastLinkUseReward = np.zeros((len(self.topo.nodeList), len(self.topo.nodeList)))       #用于记录上一次的linkUse
         n = len(self.topo.nodeList)                                  
         for i in range(0, n):
             self.QstarValueMat[i] = {}
@@ -32,12 +38,21 @@ class agent:
         '''
             初始化神经网络参数
         '''
-        filePath = './DQNpara.pth'
-        if os.path.exists(filePath) == False:
-            return
-        state = torch.load(filePath)
-        self.DQNnetwork.load_state_dict(state['DQNNetwork'])
-        self.optimizer.load_state_dict(state['optimizer'])
+        filePathNetwork = './DQNpara.pth'
+        if os.path.exists(filePathNetwork):
+            state = torch.load(filePathNetwork)
+            self.DQNnetwork.load_state_dict(state['DQNNetwork'])
+            self.optimizer.load_state_dict(state['optimizer'])
+            print("DQNparameter load ok!")
+        filePathLoss = './loss.npy'
+        if os.path.exists(filePathLoss):
+            self.lossData = np.load(filePathLoss).tolist()
+            print("loss data load ok!")
+        filePathReward = './reward.npy'
+        if os.path.exists(filePathReward):
+            self.rewardData = np.load(filePathReward).tolist()
+            print("reward load ok!")
+
     
     def chooseAction(self, org, dst):
         state = self.topo.LinkStateMat
@@ -48,8 +63,9 @@ class agent:
             path = self.kspMap[org][dst][i]
             #clear
             for id in range(0, n):
-                state[id][4] = 0
-            #state[org] = 1.0 / (len(path) + 1) 
+                state[id][6] = 0
+                state[id][7] = 0
+                state[id][8] = 0
             #赋值路径
             j = 1
             preID = -1
@@ -59,7 +75,9 @@ class agent:
                     preID = id
                     continue
                 curLink = self.topo.getEdge(self.topo.nodeList[preID],self.topo.nodeList[id])
-                state[curLink.id][4] = j / len(path)
+                state[curLink.id][6] = j / len(path)
+                state[curLink.id][7] = j / len(path)
+                state[curLink.id][8] = j / len(path)
                 preID = id
                 j += 1
             #计算相应action的Qpi, 得到最大的Qpi路径
@@ -71,7 +89,6 @@ class agent:
         path = self.kspMap[org][dst][idx]
         for id in range(0, n):
             state[id][4] = 0
-        state[org] = 1.0 / (len(path) + 1) 
         j = 1
         preID = -1
         for id in path:
@@ -79,26 +96,40 @@ class agent:
                 preID = id
                 continue
             curLink = self.topo.getEdge(self.topo.nodeList[preID],self.topo.nodeList[id])
-            state[curLink.id][4] = j / len(path)
+            state[curLink.id][6] = j / len(path)
+            state[curLink.id][7] = j / len(path)
+            state[curLink.id][8] = j / len(path)
+
             preID = id
             j += 1   
         #判断是否更新网络
         if self.lastReward[org][dst] == 0 or dst not in self.QstarValueMat[org]:
             self.lastReward[org][dst] = self.topo.reward
-            self.QstarValueMat[org][dst] = state[:]
+            self.lastPackets[org][dst] = self.topo.PacketNumInterval
+            self.lastLinkUseReward[org][dst] = self.topo.linkUseReward
+            self.QstarValueMat[org][dst] = state.copy()
             return idx
 
         if self.arg['ifUpdate']:
-            curReward =  self.lastReward[org][dst] - self.topo.reward             #因为绝对reward是负的，所以相对reward反着减
+            curReward =  self.cauReward(org, dst)
+            self.updateTime += 1
+            self.rewardData.append(float(curReward))
+            if self.updateTime % 20 == 1:
+                print("update step: " + str(self.updateTime) +  " reward:" + str(curReward))
             self.addExp(self.QstarValueMat[org][dst], curReward, state)
-            expLearn = self.getExp()
-            self.update(expLearn)
+            for i in range(0, 5):
+                expLearn = self.getExp()
+                self.update(expLearn)
             self.lastReward[org][dst] = self.topo.reward
-            self.QstarValueMat[org][dst] = state[:]
+            self.lastPackets[org][dst] = self.topo.PacketNumInterval
+            self.lastLinkUseReward[org][dst] = self.topo.linkUseReward
+            self.QstarValueMat[org][dst] = state.copy()
+            if self.updateTime % 300 == 1:
+                self.savePara()
         return idx
     
     def addExp(self, _preStateAction, _reward, _nextStateAction):
-        curExp = exp(_preStateAction[:], _reward, _nextStateAction[:])
+        curExp = exp(_preStateAction.copy(), _reward, _nextStateAction.copy())
         sorted(self.expQueue)
         self.expQueue.append(curExp)
         if len(self.expQueue) > self.arg['expQueueLength']:
@@ -110,6 +141,7 @@ class agent:
             首先构建采样概率，然后再采样
         '''
         curLength = min(len(self.expQueue), self.arg['expQueueLength'])
+        idx = random.randint(0, curLength - 1)
         sampleProbablity = []
         for i in range(0, curLength):
             if torch.is_tensor(self.expQueue[i].tdError):
@@ -128,7 +160,7 @@ class agent:
         '''
             td算法更新参数
         '''
-        tdTarget = expLearn.reward + self.DQNnetwork(expLearn.nextActionState)
+        tdTarget = expLearn.reward + self.arg['gamma']*self.DQNnetwork(expLearn.nextActionState)
         preValue = self.DQNnetwork(expLearn.preActionState)
         tdError = abs(preValue - tdTarget)
         expLearn.tdError = tdError + 0.00001
@@ -136,7 +168,24 @@ class agent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        print("loss : " + str(loss.data))
+        self.lossData.append(float(loss.data))
+
+    def cauReward(self, org, dst):
+        '''
+            用流量大小去平衡奖励
+        '''
+        r1 = 2.5               #控制reward中linkUse的奖励与时延奖励的比率
+        r2 = 25
+        a = 0
+        if self.topo.reward > 0:
+            a = self.lastReward[org][dst] / self.topo.reward
+        else:
+            a = self.topo.reward / self.lastReward[org][dst]
+        b = float(self.topo.linkUseReward) / self.lastLinkUseReward[org][dst]
+        c = float(self.topo.PacketNumInterval) / float(self.lastPackets[org][dst])
+        d = 0.3 * (c - 1) + 1
+        res = r1 * (a * c - 1) + r2 * ( b / d - 1) 
+        return res
 
     def updateReward(self, curReward):
         self.lastReward = curReward
@@ -145,15 +194,18 @@ class agent:
         '''
             保存神经网络训练参数
         '''
+        print("update time: " + str(self.updateTime) + " save data")
         state = {'DQNNetwork':self.DQNnetwork.state_dict(), 'optimizer':self.optimizer.state_dict()}
         torch.save(state,'./DQNpara.pth')
+        np.save('./loss.npy', self.lossData)
+        np.save('./reward.npy', self.rewardData)
 
 class exp:
     def __init__(self, _preActionState, _reward, _nextActionState) -> None:
         '''
             注意这里td_error实际的max不太清楚,后面训练要去修改
         '''
-        self.tdError = torch.tensor([10])
+        self.tdError = torch.tensor([100])
         self.preActionState = _preActionState
         self.reward = _reward
         self.nextActionState = _nextActionState

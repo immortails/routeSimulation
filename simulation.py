@@ -14,7 +14,9 @@ class simulation:
         self.lastTime = self.arg['lastTime']                            #仿真结束时间
         self.stepPackets = self.arg['stepPackets']                      #每1ms一个node发多少包
         self.curStatusInterval = self.arg['curStatusInterval']          #每隔多久重置一下当前时刻的链路状态
-        self.curTime = 0                                                #当前时间，计时使用 
+        self.curTime = 0                                                #当前时间，计时使用
+        self.sendPkgMat = np.zeros((self.n, self.n)) 
+        self.linkUseInterval = self.arg['linkUseInterval']
 
     def simulate(self):
         '''
@@ -22,32 +24,36 @@ class simulation:
         '''
         for i in range(1, self.lastTime):
             self.step()
+            if i % self.linkUseInterval == 0:                           #定期记录链路利用率
+                self.myTopo.updateLinkUse()
             if i % self.curStatusInterval == 0:                         #用于更新供模型reward的参数
                 self.myTopo.updateCurStatus()
-                #self.myRoute.agent.updateReward(self.myTopo.reward)
-            if self.arg['DQN'] and i % 1000 == 0:                       #保存模型参数
-                self.myRoute.agent.savePara()
-                print("cur step:" + str(i) + " cur reward: " + str(self.myTopo.reward))
+            self.update()                                               #更新所有组件
+            #if i % 10000 == 0:
+            #    self.evolution()
         self.evolution()                                                #评估指标
 
     def step(self):
         '''
             仿真每一步的工作
         '''
+        #每个节点定期发送包，按双峰模型来生成,最后1s就不发了，处理在流程中的包
+        if self.curTime % 1000 == 0 and self.curTime + 1000 < self.lastTime:
+            self.sendPkgMat = self.samplePacketNum()
+        #最后一个100s就不发了，以保证当前收到的包不会扰乱下一个时刻
+        if self.curTime + 1000 < self.lastTime and self.curTime % self.curStatusInterval < self.curStatusInterval - 100:
+            for i in range(0, self.n):
+                for j in range(0, self.n):
+                    if i == j:
+                        continue
+                    for k in range(0, int(self.sendPkgMat[i][j]/ 1000)):
+                        self.createPacket(self.myTopo.nodeList[i], self.myTopo.nodeList[j])
         #处理每一条边
         for id, curEdge in self.myTopo.edgeList.items():
             curEdge.deal()
         #处理每一个节点
         for id, curNode in self.myTopo.nodeList.items():
             self.deal(curNode)
-        #每个节点定期发送包，这个怎么处理,最后1s就不发了，处理在流程中的包
-        if self.curTime + 1000 < self.lastTime:
-            for id in range(0, self.n):
-                packetNum = random.randint(0, self.stepPackets)
-                for i in range(0, packetNum):
-                    dstID = random.randint(0, self.n - 1)
-                    self.createPacket(self.myTopo.nodeList[id], self.myTopo.nodeList[dstID])
-        self.update()           #更新所有组件
 
     def deal(self, curNode):
         '''
@@ -122,6 +128,22 @@ class simulation:
                 DelayAvg = np.mean(linkInfo.delayList)
                 DelayDev = np.var(linkInfo.delayList)
                 print("node" + str(id1) + " to node" + str(id2) + ": lossRate: " + str(lossRate) + ", delay avg: " + str(DelayAvg) + ", delay dev: " + str(DelayDev))
+
+    def samplePacketNum(self):
+        '''
+            采用双峰模型构建流量
+        '''
+        p = np.random.sample()
+        c1 = 3500
+        c2 = 4500
+        sigma = 800
+        num = 0
+        if p < 0.8:
+            num = np.random.normal(c1, sigma, self.n * self.n)
+        else:
+            num = np.random.normal(c2, sigma, self.n * self.n)
+        num.resize((self.n, self.n))
+        return num
 
 
 class edgeInfo:
