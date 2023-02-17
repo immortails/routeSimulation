@@ -11,3 +11,7 @@
 - target network
 - duling network
 - actor critic
+#### 更新日志
+**2月17日**：
+- 在网络特征中加入节点状态特征，更新了GNN模型以及整个DQN路由算法
+- 节点改成每个链路一个缓冲区的形式，更符合原理

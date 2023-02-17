@@ -81,7 +81,7 @@ class DQNagent:
                 preID = id
                 j += 1
             #计算相应action的Qpi, 得到最大的Qpi路径
-            featureValue = self.DQNnetwork(state)
+            featureValue = self.DQNnetwork(self.topo.nodeStateMat, state)
             if featureValue > maxValue:
                 maxValue = featureValue
                 idx = i
@@ -107,7 +107,7 @@ class DQNagent:
             self.lastReward[org][dst] = self.topo.reward
             self.lastPackets[org][dst] = self.topo.PacketNumInterval
             #self.lastLinkUseReward[org][dst] = self.topo.linkUseReward
-            self.QstarValueMat[org][dst] = state.copy()
+            self.QstarValueMat[org][dst] = (self.topo.nodeStateMat, state.copy())
             return idx
 
         if self.arg['ifUpdate']:
@@ -116,20 +116,20 @@ class DQNagent:
             self.rewardData.append(float(curReward))
             if self.updateTime % 20 == 1:
                 print("update step: " + str(self.updateTime) +  " reward:" + str(curReward))
-            self.addExp(self.QstarValueMat[org][dst], curReward, state)
+            self.addExp(self.QstarValueMat[org][dst][0], self.QstarValueMat[org][dst][1], curReward,self.topo.nodeStateMat, state)
             for i in range(0, 5):
                 expLearn = self.getExp()
                 self.update(expLearn)
             self.lastReward[org][dst] = self.topo.reward
             self.lastPackets[org][dst] = self.topo.PacketNumInterval
             #self.lastLinkUseReward[org][dst] = self.topo.linkUseReward
-            self.QstarValueMat[org][dst] = state.copy()
+            self.QstarValueMat[org][dst] = (self.topo.nodeStateMat, state.copy())
             if self.updateTime % 300 == 1:
                 self.savePara()
         return idx
     
-    def addExp(self, _preStateAction, _reward, _nextStateAction):
-        curExp = exp(_preStateAction.copy(), _reward, _nextStateAction.copy())
+    def addExp(self,_preNodeState, _preStateAction, _reward,_nextNodeState, _nextStateAction):
+        curExp = exp(_preNodeState.copy(), _preStateAction.copy(), _reward,_nextNodeState.copy(), _nextStateAction.copy())
         sorted(self.expQueue)
         self.expQueue.append(curExp)
         if len(self.expQueue) > self.arg['expQueueLength']:
@@ -160,8 +160,8 @@ class DQNagent:
         '''
             td算法更新参数
         '''
-        tdTarget = expLearn.reward + self.arg['gamma']*self.DQNnetwork(expLearn.nextActionState)
-        preValue = self.DQNnetwork(expLearn.preActionState)
+        tdTarget = expLearn.reward + self.arg['gamma']*self.DQNnetwork(expLearn.nextNodeState, expLearn.nextActionState)
+        preValue = self.DQNnetwork(expLearn.nextNodeState, expLearn.nextActionState)
         tdError = abs(preValue - tdTarget)
         expLearn.tdError = tdError + 0.00001
         loss = self.lossFunc(preValue, tdTarget)
@@ -201,13 +201,15 @@ class DQNagent:
         np.save('./reward.npy', self.rewardData)
 
 class exp:
-    def __init__(self, _preActionState, _reward, _nextActionState) -> None:
+    def __init__(self,_preNodeState, _preActionState, _reward,_nextNodeState, _nextActionState) -> None:
         '''
             注意这里td_error实际的max不太清楚,后面训练要去修改
         '''
         self.tdError = torch.tensor([100])
         self.preActionState = _preActionState
+        self.preNodeState = _preNodeState
         self.reward = _reward
         self.nextActionState = _nextActionState
+        self.nextNodeState = _nextNodeState
     def __lt__(self, other):
         return self.tdError > other.tdError

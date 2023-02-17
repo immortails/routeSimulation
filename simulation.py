@@ -24,8 +24,10 @@ class simulation:
         '''
         for i in range(1, self.lastTime):
             self.step()
-            if i % self.linkUseInterval == 0:                           #定期记录链路利用率
-                self.myTopo.updateLinkUse()
+            if i % self.linkUseInterval == 0:                           #定期记录链路利用率，节点队列利用率
+                self.myTopo.updateLinkNodeUse()
+            if i % 1000 == 0:
+                print("step: " + str(i))
             if i % self.curStatusInterval == 0:                         #用于更新供模型reward的参数
                 self.myTopo.updateCurStatus()
             self.update()                                               #更新所有组件
@@ -46,7 +48,7 @@ class simulation:
                 for j in range(0, self.n):
                     if i == j:
                         continue
-                    for k in range(0, int(self.sendPkgMat[i][j]/ 1000)):
+                    for k in range(0, int(self.sendPkgMat[i][j]/ 900)):
                         self.createPacket(self.myTopo.nodeList[i], self.myTopo.nodeList[j])
         #处理每一条边
         for id, curEdge in self.myTopo.edgeList.items():
@@ -58,33 +60,40 @@ class simulation:
     def deal(self, curNode):
         '''
             处理每一个node的发包,这里提到simulation的原因是要记录每个包的结果,如果这个包发给自己就收下来。
+            依次处理掉每个队列的包
         '''
-        num = 0
-        while num <= curNode.bandWidth:
-            if len(curNode.packetQueue) == 0:
-                break
-            curPacket = curNode.packetQueue.popleft()
-            curNode.size -= 1
-            #如果发送到目的地，收下来并记录
+        while len(curNode.packageQueue) != 0:
+            curPacket = curNode.packageQueue.popleft()
             if curPacket.ttl == 0:
                 continue
             if curPacket.dst == curNode.id:
                 self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
                 self.myTopo.curStatus[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
                 continue
-            #发送给目的地
-            else:
-                num += 1
-                nextID = self.myRoute.next(curNode.id, curPacket.dst)
-                curEdge = self.myTopo.getEdge(node1 = curNode, node2 = self.myTopo.nodeList[nextID])
-                if curEdge.full():
+            nextID = self.myRoute.next(curNode.id, curPacket.dst)
+            curQueue = curNode.neighbor[nextID][2]
+            if len(curQueue) >= curNode.capacity:
+                curQueue.pop()
+            curPacket.next = nextID            
+            curQueue.append(curPacket)
+            curNode.size += 1
+
+        for nextID, info in curNode.neighbor.items():
+            nextQueue = info[2]
+            nextEdge = info[0]
+            for i in range(0, curNode.bandWidth):
+                if len(nextQueue) == 0:
+                    break
+                curPacket = nextQueue.popleft()
+                curNode.size -= 1
+                if nextEdge.full():
                     #这样处理属实是因为python中的deque没有访问元素的方式，必须要拿出来，真的离谱
-                    curNode.packetQueue.appendleft(curPacket)
+                    nextQueue.appendleft(curPacket)
                     curNode.size += 1
-                    continue
-                curPacket.changeNext(nextID)
+                    break
                 curPacket.ttl -= 1
-                curEdge.push(curPacket)
+                nextEdge.push(curPacket)
+
 
     
     def createPacket(self, curNode, dstNode):
@@ -134,9 +143,9 @@ class simulation:
             采用双峰模型构建流量
         '''
         p = np.random.sample()
-        c1 = 4000
-        c2 = 5000
-        sigma = 1000
+        c1 = 6000
+        c2 = 3000
+        sigma = 750
         num = 0
         if p < 0.8:
             num = np.random.normal(c1, sigma, self.n * self.n)
