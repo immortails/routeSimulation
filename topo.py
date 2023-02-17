@@ -81,11 +81,12 @@ class topo:
         DelayAvg = 0
         DelayDev = 0
         lossRate = 0
-        linkUse = 0.0
+        linkUse = []
         n = 0           #n是为了避免两个节点之间无数据的情况
         a = 0.01
         b = 0.05
         c = 20
+        d = 20
         self.PacketNumInterval = 0                              #先清零流量记录
         for id1, node1 in self.nodeList.items():
             for id2, node2 in self.nodeList.items():
@@ -101,14 +102,13 @@ class topo:
                     DelayAvg += np.mean(linkInfo.delayList)
                     DelayDev += np.std(linkInfo.delayList)
         for i in range(0, len(self.LinkStateMat)):
-            linkUse += self.LinkStateMat[i][0]
-        linkUse /= len(self.LinkStateMat)
+            linkUse.append(self.LinkStateMat[i][0])
         if n == 0:
             return
-        self.reward = a * float(DelayAvg) / n + b * float(DelayDev) / n + c * float(lossRate) / n
-        self.linkUseReward = linkUse 
+        self.linkUseReward = np.std(linkUse) 
+        self.reward = a * float(DelayAvg) / n + b * float(DelayDev) / n + c * float(lossRate) / n + d * float(self.linkUseReward) / n
         #self.reward = -d * linkUse
-        print("step:" + str(self.curTime) + " packets: " + str(self.PacketNumInterval) + " reward: " + str(self.reward) + " delayAvg: " + str(DelayAvg/n) + " delayStd: " + str(DelayDev/n) + " lossRate: " + str(lossRate/n) + " linkUse: " + str(linkUse))
+        print("step:" + str(self.curTime) + " packets: " + str(self.PacketNumInterval) + " reward: " + str(self.reward) + " delayAvg: " + str(DelayAvg/n) + " delayStd: " + str(DelayDev/n) + " lossRate: " + str(lossRate/n) + " linkUseStd: " + str(self.linkUseReward))
 
     def updateLinkUse(self):
         for ids, link in self.edgeList.items():

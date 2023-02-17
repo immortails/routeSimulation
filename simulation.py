@@ -134,9 +134,9 @@ class simulation:
             采用双峰模型构建流量
         '''
         p = np.random.sample()
-        c1 = 3500
-        c2 = 4500
-        sigma = 800
+        c1 = 4000
+        c2 = 5000
+        sigma = 1000
         num = 0
         if p < 0.8:
             num = np.random.normal(c1, sigma, self.n * self.n)

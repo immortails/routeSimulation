@@ -1,7 +1,7 @@
 #coding=utf-8
 import networkx as nx
 import numpy as np
-from route.rlagent.agent import agent
+from route.rlagent.DQNagent import DQNagent
 import random
 class route:
     topo = None                     
@@ -80,7 +80,7 @@ class DQRroute(route):
             'modelArg' : self.modelArg,
             'ifUpdate' : True,
             'actionSpace' : self.actionSpace,
-            'learnRate' : 0.001,
+            'learnRate' : 0.00001,
             'expQueueLength': 1000,
             'beta': 0.5,
             'gamma': 0.95,
@@ -93,7 +93,7 @@ class DQRroute(route):
         for id1 in range(0, n):
             for id2 in range(0, n):
                 self.kspMap[id1][id2] = []      
-        self.agent = agent(self.agentArg, self.topo, self.kspMap)   
+        self.agent = DQNagent(self.agentArg, self.topo, self.kspMap)   
 
     def createLinkConn(self, edgeList):
         '''
@@ -149,8 +149,7 @@ class DQRroute(route):
         #路由过期
         n = len(self.kspMap[orgID][dstID])
         action = random.randint(0, n - 1)
-        #加入一点随机性在里面
-        if random.randint(0, 100) < 95 and n == self.actionSpace:
+        if n == self.actionSpace:
             action = self.agent.chooseAction(orgID, dstID)
         path = self.kspMap[orgID][dstID][action]
         preID = -1
