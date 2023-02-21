@@ -2,6 +2,7 @@
 import networkx as nx
 import numpy as np
 from route.rlagent.DQNagent import DQNagent
+from route.rlagent.D3QNAgent import D3QNagent
 import random
 class route:
     topo = None                     
@@ -82,7 +83,7 @@ class DQRroute(route):
             'modelArg' : self.modelArg,
             'ifUpdate' : True,
             'actionSpace' : self.actionSpace,
-            'learnRate' : 0.00001,
+            'learnRate' : 0.0001,
             'expQueueLength': 1000,
             'beta': 0.5,
             'gamma': 0.95,
@@ -95,7 +96,8 @@ class DQRroute(route):
         for id1 in range(0, n):
             for id2 in range(0, n):
                 self.kspMap[id1][id2] = []      
-        self.agent = DQNagent(self.agentArg, self.topo, self.kspMap)   
+        self.agent = DQNagent(self.agentArg, self.topo, self.kspMap) 
+        #self.agent = D3QNagent(self.agentArg, self.topo, self.kspMap)  
 
     def createLinkNodeConn(self, nodeList, edgeList):
         '''

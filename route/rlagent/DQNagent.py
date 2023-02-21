@@ -4,6 +4,7 @@ from torch import nn
 import torch
 import os
 import random
+fileIdx = '1'
 class DQNagent:
     def __init__(self, _arg, _topo, _kspMap) -> None:
         '''
@@ -21,6 +22,7 @@ class DQNagent:
         self.QstarValueMat = {}                                                                     #用于保存上一次计算的actionState，方便训练
         self.updateTime = 0                                                                         #用于记录迭代次数
         self.rewardData = []                                                                        #用于记录reward
+        self.evolution = []
         self.lastPackets = np.zeros((len(self.topo.nodeList), len(self.topo.nodeList)))             #用于记录上一次的总packet
         #self.lastLinkUseReward = np.zeros((len(self.topo.nodeList), len(self.topo.nodeList)))       #用于记录上一次的linkUse
         n = len(self.topo.nodeList)                                  
@@ -38,20 +40,24 @@ class DQNagent:
         '''
             初始化神经网络参数
         '''
-        filePathNetwork = './DQNpara.pth'
+        filePathNetwork = './logPara/'+fileIdx+'/DQNpara.pth'
         if os.path.exists(filePathNetwork):
             state = torch.load(filePathNetwork)
             self.DQNnetwork.load_state_dict(state['DQNNetwork'])
             self.optimizer.load_state_dict(state['optimizer'])
             print("DQNparameter load ok!")
-        filePathLoss = './loss.npy'
+        filePathLoss = './logPara/' + fileIdx + '/loss.npy'
         if os.path.exists(filePathLoss):
             self.lossData = np.load(filePathLoss).tolist()
             print("loss data load ok!")
-        filePathReward = './reward.npy'
+        filePathReward = './logPara/' + fileIdx + '/reward.npy'
         if os.path.exists(filePathReward):
             self.rewardData = np.load(filePathReward).tolist()
             print("reward load ok!")
+        filePathEvo = './logPara/' + fileIdx + '/evolution.npy'
+        if os.path.exists(filePathEvo):
+            self.evolution = np.load(filePathEvo).tolist()
+            print("evolution load ok!")        
 
     
     def chooseAction(self, org, dst):
@@ -114,13 +120,14 @@ class DQNagent:
             curReward =  self.cauReward(org, dst)
             self.updateTime += 1
             self.rewardData.append(float(curReward))
+            self.evolution.append(self.topo.evolution[:])
             if self.updateTime % 20 == 1:
                 print("update step: " + str(self.updateTime) +  " reward:" + str(curReward))
             self.addExp(self.QstarValueMat[org][dst][0], self.QstarValueMat[org][dst][1], curReward,self.topo.nodeStateMat, state)
-            for i in range(0, 5):
+            for i in range(0, 2):
                 expLearn = self.getExp()
                 self.update(expLearn)
-            self.lastReward[org][dst] = self.topo.reward
+            self.lastReward[org][dst] = 0.8 * self.lastReward[org][dst] + 0.2 * self.topo.reward
             self.lastPackets[org][dst] = self.topo.PacketNumInterval
             #self.lastLinkUseReward[org][dst] = self.topo.linkUseReward
             self.QstarValueMat[org][dst] = (self.topo.nodeStateMat, state.copy())
@@ -182,9 +189,11 @@ class DQNagent:
         else:
             a = self.topo.reward / self.lastReward[org][dst]
         #b = float(self.topo.linkUseReward) / self.lastLinkUseReward[org][dst]
+        #c = float(self.topo.PacketNumInterval - 3000000) / float(self.lastPackets[org][dst] - 3000000)
         c = float(self.topo.PacketNumInterval) / float(self.lastPackets[org][dst])
         #d = 0.3 * (c - 1) + 1
         res = r1 * (a * c - 1)
+        #res = -self.topo.reward / 10
         return res
 
     def updateReward(self, curReward):
@@ -196,9 +205,10 @@ class DQNagent:
         '''
         print("update time: " + str(self.updateTime) + " save data")
         state = {'DQNNetwork':self.DQNnetwork.state_dict(), 'optimizer':self.optimizer.state_dict()}
-        torch.save(state,'./DQNpara.pth')
-        np.save('./loss.npy', self.lossData)
-        np.save('./reward.npy', self.rewardData)
+        torch.save(state,'./logPara/' + fileIdx + '/DQNpara.pth')
+        np.save('./logPara/' + fileIdx + '/loss.npy', self.lossData)
+        np.save('./logPara/'+ fileIdx + '/reward.npy', self.rewardData)
+        np.save('./logPara/'+ fileIdx + '/evolution.npy',self.evolution)
 
 class exp:
     def __init__(self,_preNodeState, _preActionState, _reward,_nextNodeState, _nextActionState) -> None:

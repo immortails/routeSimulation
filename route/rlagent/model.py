@@ -86,43 +86,4 @@ class ValueNetwork(nn.Module):
         value = self.hidden2(value)
         value = self.sigmoid(value)
         value = self.output(value)
-        return value
-
-class DuelingNetwork(nn.Module):
-    '''
-        写的有问题,要大改
-    '''
-    def __init__(self, modelArg) -> None:
-        super().__init__()
-        self.arg = modelArg
-        self.FeatureModel = FeatureNetwork(modelArg)
-        self.link_dim = self.arg['link_state_dim']
-        self.hidden1 = nn.Linear(self.link_dim, self.link_dim)
-        self.hidden2 = nn.Linear(self.link_dim, self.link_dim)
-        self.output1 = nn.Linear(self.link_dim, 1)
-        self.sigmoid = nn.Sigmoid()
-
-        self.hidden3 = nn.Linear(self.link_dim, self.link_dim)
-        self.hidden4 = nn.Linear(self.link_dim, self.link_dim)
-        self.output2 = nn.Linear(self.link_dim, 1)
-
-    def forward(self, inputList):
-        #提取特征
-        linkState = self.FeatureModel(inputList)
-        feature = torch.sum(linkState, 1)
-        #advantage函数
-        advantage = self.hidden1(feature)
-        advantage = self.sigmoid(advantage)
-        advantage = self.hidden2(advantage)
-        advantage = self.sigmoid(advantage)
-        advantage = self.output1(advantage)
-        #valueState函数
-        valueState = self.hidden3(feature)
-        valueState = self.sigmoid(valueState)
-        valueState = self.hidden4(valueState)
-        valueState = self.sigmoid(valueState)
-        valueState = self.output2(valueState)
-        #最终输出actionState函数
-        res = valueState - torch.max(advantage)
-        res = self.sigmoid(res) * 10
-        return res
+        return 10 * value

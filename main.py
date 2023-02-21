@@ -9,7 +9,7 @@ import topoMat
 
 lastTime = 100000000000     #仿真长度
 stepPackets = 85            #每次随机生成包数量
-nodeQueueCapacity = 100000  #节点队列容量
+nodeQueueCapacity = 10000   #节点队列容量
 nodeBandWidth = 250         #节点1次可以处理多少个包
 curInterval = 5000          #计算当前时刻链路状态的间隔
 linkUseInterval = 100       #计算链路利用率的状态间隔

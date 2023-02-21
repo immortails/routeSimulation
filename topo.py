@@ -22,6 +22,10 @@ class topo:
         self.nodeList = {}                                                          #topo的所有节点
         self.edgeList = {}                                                          #topo的所有边
         self.curTime = 0                                                            #当前仿真时间
+        #用于最后做统计评估的
+        self.linkUseRecord = []
+        self.nodeUseRecord = []
+        self.evolution = []
         #初始化所有node
         for i in range(0, n):
             curNode = node.node(i, self.nodeQueueCapacity, self.nodeBandWidth)
@@ -88,10 +92,10 @@ class topo:
         linkUse = []
         nodeUse = []
         n = 0           #n是为了避免两个节点之间无数据的情况
-        a = 0.01
-        b = 0.05
+        a = 0.02
+        b = 0.002
         c = 20
-        d = 20
+        d = 10
         e = 10
         self.PacketNumInterval = 0                              #先清零流量记录
         for id1, node1 in self.nodeList.items():
@@ -115,11 +119,15 @@ class topo:
             nodeUse.append(self.nodeStateMat[i][0])
         self.linkUseReward = np.std(linkUse) 
         self.nodeUseReward = np.std(nodeUse)
+        #self.linkUseRecord.append(self.linkUseReward)
+        #self.nodeUseRecord.append(self.nodeUseReward)
         self.reward = a * float(DelayAvg) / n + b * float(DelayDev) / n + c * float(lossRate) / n + d * float(self.linkUseReward) / n + e * float(self.nodeUseReward)
         #self.reward = -d * linkUse
+        self.evolution = [float(DelayAvg) / n, float(DelayDev) / n, float(lossRate) / n, np.mean(linkUse), np.mean(nodeUse)]
         print("step:" + str(self.curTime) + " packets: " + str(self.PacketNumInterval) + " reward: " 
             + str(self.reward) + " delayAvg: " + str(DelayAvg/n) + " delayStd: " + str(DelayDev/n) 
                 + " lossRate: " + str(lossRate/n) + " linkUseStd: " + str(self.linkUseReward) + " NodeUseStd: " + str(self.nodeUseReward))
+        print(" linkUse: " + str(np.mean(linkUse)) + " nodeUse: " + str(np.mean(nodeUse)))
 
     def updateLinkNodeUse(self):
         '''

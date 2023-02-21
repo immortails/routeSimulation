@@ -26,8 +26,6 @@ class simulation:
             self.step()
             if i % self.linkUseInterval == 0:                           #定期记录链路利用率，节点队列利用率
                 self.myTopo.updateLinkNodeUse()
-            if i % 1000 == 0:
-                print("step: " + str(i))
             if i % self.curStatusInterval == 0:                         #用于更新供模型reward的参数
                 self.myTopo.updateCurStatus()
             self.update()                                               #更新所有组件
@@ -67,13 +65,14 @@ class simulation:
             if curPacket.ttl == 0:
                 continue
             if curPacket.dst == curNode.id:
-                self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
+                #self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
                 self.myTopo.curStatus[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
                 continue
             nextID = self.myRoute.next(curNode.id, curPacket.dst)
             curQueue = curNode.neighbor[nextID][2]
             if len(curQueue) >= curNode.capacity:
                 curQueue.pop()
+                curNode.size -= 1
             curPacket.next = nextID            
             curQueue.append(curPacket)
             curNode.size += 1
@@ -106,7 +105,7 @@ class simulation:
         curPacket = packet.packet(curNode.id, dstNode.id, nextID, 64, self.curTime)
         curEdge = self.myTopo.getEdge(node1 = curNode, node2 = self.myTopo.nodeList[nextID])
         curEdge.push(curPacket)
-        self.myTopo.status[(curNode.id, dstNode.id)].sendOK()
+        #self.myTopo.status[(curNode.id, dstNode.id)].sendOK()
         self.myTopo.curStatus[(curNode.id, dstNode.id)].sendOK()        
 
     def update(self):
@@ -127,25 +126,43 @@ class simulation:
         '''
             评价拓扑指标
         '''
-        print("当前仿真步长" + str(self.curTime))
+        lossRate = 0.0
+        DelayAvg = 0.0
+        DelayDev = 0.0
+        n = 0           #n是为了避免两个节点之间无数据的情况
+        a = 0.02
+        b = 0.002
+        c = 20
+        d = 10
+        e = 10
         for id1, node1 in self.myTopo.nodeList.items():
             for id2, node2 in self.myTopo.nodeList.items():
                 if id1 == id2:
                     continue
                 linkInfo = self.myTopo.status[(id1, id2)]
-                lossRate = 1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum
-                DelayAvg = np.mean(linkInfo.delayList)
-                DelayDev = np.var(linkInfo.delayList)
-                print("node" + str(id1) + " to node" + str(id2) + ": lossRate: " + str(lossRate) + ", delay avg: " + str(DelayAvg) + ", delay dev: " + str(DelayDev))
+                if linkInfo.packageNum == 0:
+                    continue
+                n += 1
+                lossRate += max(1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum, 0)
+                if len(linkInfo.delayList) != 0:
+                    DelayAvg += np.mean(linkInfo.delayList)
+                    DelayDev += np.std(linkInfo.delayList)
+        if n == 0:
+            return
+        linkUseFinal = np.mean(self.myTopo.linkUseRecord) 
+        nodeUseFinal = np.mean(self.myTopo.nodeUseRecord)
+        reward = a * float(DelayAvg) / n + b * float(DelayDev) / n + c * float(lossRate) / n
+        print(" reward: "  + str(reward) + " delayAvg: " + str(DelayAvg/n) + " delayStd: " + str(DelayDev/n) 
+                + " lossRate: " + str(lossRate/n) + " linkUse: " + str(np.mean(linkUseFinal)) + " nodeUse: " + str(np.mean(nodeUseFinal)))
 
     def samplePacketNum(self):
         '''
             采用双峰模型构建流量
         '''
         p = np.random.sample()
-        c1 = 6000
-        c2 = 3000
-        sigma = 750
+        c1 = 5000
+        c2 = 3500
+        sigma = 600
         num = 0
         if p < 0.8:
             num = np.random.normal(c1, sigma, self.n * self.n)
