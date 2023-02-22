@@ -6,7 +6,7 @@ import os
 import random
 from route.rlagent.DQNagent import DQNagent
 from route.rlagent.DQNagent import exp
-fileIdx = '2'
+fileIdx = '3'
 class D3QNagent(DQNagent):
     def __init__(self, _arg, _topo, _kspMap) -> None:
         self.arg = _arg                                                                             #agent 所需要的一系列参数
@@ -113,7 +113,7 @@ class D3QNagent(DQNagent):
             for i in range(0, 2):
                 expLearn = self.getExp()
                 self.update(expLearn)
-            self.lastReward[org][dst] = 0.8 * self.lastReward[org][dst] + 0.2 * self.topo.reward
+            self.lastReward[org][dst] = 0.99 * self.lastReward[org][dst] + 0.01 * self.topo.reward
             self.lastPackets[org][dst] = self.topo.PacketNumInterval
             #self.lastLinkUseReward[org][dst] = self.topo.linkUseReward
             self.QstarValueMat[org][dst] = (self.topo.nodeStateMat, state.copy())
@@ -266,6 +266,25 @@ class D3QNagent(DQNagent):
         self.expQueue.append(curExp)
         if len(self.expQueue) > self.arg['expQueueLength']:
             self.expQueue.pop()
+
+    def cauReward(self, org, dst):
+        '''
+            用流量大小去平衡奖励
+        '''
+        r1 = 4               
+        #r2 = 10
+        a = 0
+        if self.topo.reward > 0:
+            a = self.lastReward[org][dst] / self.topo.reward
+        else:
+            a = self.topo.reward / self.lastReward[org][dst]
+        #b = float(self.topo.linkUseReward) / self.lastLinkUseReward[org][dst]
+        c = float(self.topo.PacketNumInterval - 1000000) / float(self.lastPackets[org][dst] - 1000000)
+        #c = float(self.topo.PacketNumInterval) / float(self.lastPackets[org][dst])
+        #d = 0.3 * (c - 1) + 1
+        res = r1 * (a * c - 1)
+        #res = -self.topo.reward / 10
+        return res
 
 class expDueling(exp):
     def __init__(self, _preNodeState, _preActionState, _reward, _nextNodeState, _nextActionState, _org, _dst) -> None:

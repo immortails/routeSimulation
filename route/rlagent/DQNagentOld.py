@@ -4,7 +4,8 @@ from torch import nn
 import torch
 import os
 import random
-class DQNagent:
+path = "old"
+class DQNagentOld:
     def __init__(self, _arg, _topo, _kspMap) -> None:
         '''
             arg 参数包括 ifUpdate, modelArg, actionSpace, learnRate, expQueueLength, beta, gamma
@@ -22,6 +23,7 @@ class DQNagent:
         self.updateTime = 0                                                                         #用于记录迭代次数
         self.rewardData = []                                                                        #用于记录reward
         self.lastPackets = np.zeros((len(self.topo.nodeList), len(self.topo.nodeList)))             #用于记录上一次的总packet
+        self.evolution = []
         #self.lastLinkUseReward = np.zeros((len(self.topo.nodeList), len(self.topo.nodeList)))       #用于记录上一次的linkUse
         n = len(self.topo.nodeList)                                  
         for i in range(0, n):
@@ -38,20 +40,24 @@ class DQNagent:
         '''
             初始化神经网络参数
         '''
-        filePathNetwork = './DQNpara.pth'
+        filePathNetwork = './logPara/'+ path + '/DQNpara.pth'
         if os.path.exists(filePathNetwork):
             state = torch.load(filePathNetwork)
             self.DQNnetwork.load_state_dict(state['DQNNetwork'])
             self.optimizer.load_state_dict(state['optimizer'])
             print("DQNparameter load ok!")
-        filePathLoss = './loss.npy'
+        filePathLoss = './logPara/'+ path + '/loss.npy'
         if os.path.exists(filePathLoss):
             self.lossData = np.load(filePathLoss).tolist()
             print("loss data load ok!")
-        filePathReward = './reward.npy'
+        filePathReward = './logPara/'+ path + '/reward.npy'
         if os.path.exists(filePathReward):
             self.rewardData = np.load(filePathReward).tolist()
             print("reward load ok!")
+        filePathEvo = './logPara/' + path + '/evolution.npy'
+        if os.path.exists(filePathEvo):
+            self.evolution = np.load(filePathEvo).tolist()
+            print("evolution load ok!")  
 
     
     def chooseAction(self, org, dst):
@@ -114,13 +120,14 @@ class DQNagent:
             curReward =  self.cauReward(org, dst)
             self.updateTime += 1
             self.rewardData.append(float(curReward))
+            self.evolution.append(self.topo.evolution[:])
             if self.updateTime % 20 == 1:
                 print("update step: " + str(self.updateTime) +  " reward:" + str(curReward))
             self.addExp(self.QstarValueMat[org][dst], curReward, state)
             for i in range(0, 5):
                 expLearn = self.getExp()
                 self.update(expLearn)
-            self.lastReward[org][dst] = self.topo.reward
+            self.lastReward[org][dst] = 0.99 * self.lastReward + 0.01 * self.topo.reward
             self.lastPackets[org][dst] = self.topo.PacketNumInterval
             #self.lastLinkUseReward[org][dst] = self.topo.linkUseReward
             self.QstarValueMat[org][dst] = state.copy()
@@ -129,7 +136,7 @@ class DQNagent:
         return idx
     
     def addExp(self, _preStateAction, _reward, _nextStateAction):
-        curExp = exp(_preStateAction.copy(), _reward, _nextStateAction.copy())
+        curExp = expOld(_preStateAction.copy(), _reward, _nextStateAction.copy())
         sorted(self.expQueue)
         self.expQueue.append(curExp)
         if len(self.expQueue) > self.arg['expQueueLength']:
@@ -182,7 +189,7 @@ class DQNagent:
         else:
             a = self.topo.reward / self.lastReward[org][dst]
         #b = float(self.topo.linkUseReward) / self.lastLinkUseReward[org][dst]
-        c = float(self.topo.PacketNumInterval) / float(self.lastPackets[org][dst])
+        c = float(self.topo.PacketNumInterval - 1000000) / float(self.lastPackets[org][dst] - 1000000)
         #d = 0.3 * (c - 1) + 1
         res = r1 * (a * c - 1)
         return res
@@ -196,11 +203,12 @@ class DQNagent:
         '''
         print("update time: " + str(self.updateTime) + " save data")
         state = {'DQNNetwork':self.DQNnetwork.state_dict(), 'optimizer':self.optimizer.state_dict()}
-        torch.save(state,'./DQNpara.pth')
-        np.save('./loss.npy', self.lossData)
-        np.save('./reward.npy', self.rewardData)
+        torch.save(state,'./logPara/'+ path + '/DQNpara.pth')
+        np.save('./logPara/'+ path + '/loss.npy', self.lossData)
+        np.save('./logPara/'+ path + '/reward.npy', self.rewardData)
+        np.save('./logPara/'+ path + '/evolution.npy',self.evolution)              
 
-class exp:
+class expOld:
     def __init__(self, _preActionState, _reward, _nextActionState) -> None:
         '''
             注意这里td_error实际的max不太清楚,后面训练要去修改

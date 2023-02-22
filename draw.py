@@ -2,7 +2,7 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 
-pathIdx = "1"
+pathIdx = "3"
 reward = np.load('./logPara/' + pathIdx + '/reward.npy').tolist()
 loss = np.load('./logPara/' + pathIdx + '/loss.npy').tolist()
 

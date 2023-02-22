@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 from route.rlagent.DQNagent import DQNagent
 from route.rlagent.D3QNAgent import D3QNagent
+from route.rlagent.DQNagentOld import DQNagentOld
 import random
 class route:
     topo = None                     
@@ -70,13 +71,14 @@ class DQRroute(route):
         super().__init__(_topo, _arg)
         self.actionSpace = 4              #action space的空间大小
         link_idx, node_idx = self.createLinkNodeConn(self.topo.nodeList, self.topo.edgeList)
+        link_idx_old = self.createLinkConnOld(self.topo.edgeList)
         self.modelArg = {
             'T' : 20,
             'link_state_dim': 25,
             'node_num': len(self.topo.nodeList),
             'edge_num': len(self.topo.edgeList),
             'node_connection': node_idx,
-            'link_connection': link_idx,
+            'link_connection': link_idx_old,
             'feature_num': self.actionSpace,
         }
         self.agentArg = {
@@ -96,8 +98,9 @@ class DQRroute(route):
         for id1 in range(0, n):
             for id2 in range(0, n):
                 self.kspMap[id1][id2] = []      
-        self.agent = DQNagent(self.agentArg, self.topo, self.kspMap) 
-        #self.agent = D3QNagent(self.agentArg, self.topo, self.kspMap)  
+        #self.agent = DQNagent(self.agentArg, self.topo, self.kspMap) 
+        #self.agent = D3QNagent(self.agentArg, self.topo, self.kspMap)
+        self.agent = DQNagentOld(self.agentArg, self.topo, self.kspMap)  
 
     def createLinkNodeConn(self, nodeList, edgeList):
         '''
@@ -118,6 +121,27 @@ class DQRroute(route):
                 nodeMat[curNode.id][link.id] = 1
 
         return linkMat, nodeMat
+
+    def createLinkConnOld(self, edgeList):
+        '''
+            创建mpnn按INDEX乘所需的矩阵,老版本只有边的时候
+        '''
+        n = len(edgeList)
+        linkMat = np.zeros((n, n))
+        for ids, curEdge in edgeList.items():
+            curNode1 = curEdge.neighborNode[ids[0]]
+            curNode2 = curEdge.neighborNode[ids[1]]
+            for neighborID, info in curNode1.neighbor.items():
+                neighborEdge = info[0]
+                if curEdge.id == neighborEdge.id:
+                    continue
+                linkMat[curEdge.id][neighborEdge.id] = 1
+            for neighborID, info in curNode2.neighbor.items():
+                neighborEdge = info[0]
+                if curEdge.id == neighborEdge.id:
+                    continue
+                linkMat[curEdge.id][neighborEdge.id] = 1  
+        return linkMat
 
     def setMap(self):
         '''
