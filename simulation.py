@@ -24,8 +24,8 @@ class simulation:
         '''
         for i in range(1, self.lastTime):
             self.step()
-            if i % self.linkUseInterval == 0:                           #定期记录链路利用率
-                self.myTopo.updateLinkUse()
+            if i % self.linkUseInterval == 0:                           #定期记录链路利用率，节点队列利用率
+                self.myTopo.updateLinkNodeUse()
             if i % self.curStatusInterval == 0:                         #用于更新供模型reward的参数
                 self.myTopo.updateCurStatus()
             self.update()                                               #更新所有组件
@@ -46,7 +46,7 @@ class simulation:
                 for j in range(0, self.n):
                     if i == j:
                         continue
-                    for k in range(0, int(self.sendPkgMat[i][j]/ 1000)):
+                    for k in range(0, int(self.sendPkgMat[i][j]/ 900)):
                         self.createPacket(self.myTopo.nodeList[i], self.myTopo.nodeList[j])
         #处理每一条边
         for id, curEdge in self.myTopo.edgeList.items():
@@ -58,33 +58,41 @@ class simulation:
     def deal(self, curNode):
         '''
             处理每一个node的发包,这里提到simulation的原因是要记录每个包的结果,如果这个包发给自己就收下来。
+            依次处理掉每个队列的包
         '''
-        num = 0
-        while num <= curNode.bandWidth:
-            if len(curNode.packetQueue) == 0:
-                break
-            curPacket = curNode.packetQueue.popleft()
-            curNode.size -= 1
-            #如果发送到目的地，收下来并记录
+        while len(curNode.packageQueue) != 0:
+            curPacket = curNode.packageQueue.popleft()
             if curPacket.ttl == 0:
                 continue
             if curPacket.dst == curNode.id:
-                self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
+                #self.myTopo.status[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
                 self.myTopo.curStatus[(curPacket.org, curPacket.dst)].recvOK(self.curTime - curPacket.orgTime)
                 continue
-            #发送给目的地
-            else:
-                num += 1
-                nextID = self.myRoute.next(curNode.id, curPacket.dst)
-                curEdge = self.myTopo.getEdge(node1 = curNode, node2 = self.myTopo.nodeList[nextID])
-                if curEdge.full():
+            nextID = self.myRoute.next(curNode.id, curPacket.dst)
+            curQueue = curNode.neighbor[nextID][2]
+            if len(curQueue) >= curNode.capacity:
+                curQueue.pop()
+                curNode.size -= 1
+            curPacket.next = nextID            
+            curQueue.append(curPacket)
+            curNode.size += 1
+
+        for nextID, info in curNode.neighbor.items():
+            nextQueue = info[2]
+            nextEdge = info[0]
+            for i in range(0, curNode.bandWidth):
+                if len(nextQueue) == 0:
+                    break
+                curPacket = nextQueue.popleft()
+                curNode.size -= 1
+                if nextEdge.full():
                     #这样处理属实是因为python中的deque没有访问元素的方式，必须要拿出来，真的离谱
-                    curNode.packetQueue.appendleft(curPacket)
+                    nextQueue.appendleft(curPacket)
                     curNode.size += 1
-                    continue
-                curPacket.changeNext(nextID)
+                    break
                 curPacket.ttl -= 1
-                curEdge.push(curPacket)
+                nextEdge.push(curPacket)
+
 
     
     def createPacket(self, curNode, dstNode):
@@ -97,7 +105,7 @@ class simulation:
         curPacket = packet.packet(curNode.id, dstNode.id, nextID, 64, self.curTime)
         curEdge = self.myTopo.getEdge(node1 = curNode, node2 = self.myTopo.nodeList[nextID])
         curEdge.push(curPacket)
-        self.myTopo.status[(curNode.id, dstNode.id)].sendOK()
+        #self.myTopo.status[(curNode.id, dstNode.id)].sendOK()
         self.myTopo.curStatus[(curNode.id, dstNode.id)].sendOK()        
 
     def update(self):
@@ -118,25 +126,43 @@ class simulation:
         '''
             评价拓扑指标
         '''
-        print("当前仿真步长" + str(self.curTime))
+        lossRate = 0.0
+        DelayAvg = 0.0
+        DelayDev = 0.0
+        n = 0           #n是为了避免两个节点之间无数据的情况
+        a = 0.02
+        b = 0.002
+        c = 20
+        d = 10
+        e = 10
         for id1, node1 in self.myTopo.nodeList.items():
             for id2, node2 in self.myTopo.nodeList.items():
                 if id1 == id2:
                     continue
                 linkInfo = self.myTopo.status[(id1, id2)]
-                lossRate = 1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum
-                DelayAvg = np.mean(linkInfo.delayList)
-                DelayDev = np.var(linkInfo.delayList)
-                print("node" + str(id1) + " to node" + str(id2) + ": lossRate: " + str(lossRate) + ", delay avg: " + str(DelayAvg) + ", delay dev: " + str(DelayDev))
+                if linkInfo.packageNum == 0:
+                    continue
+                n += 1
+                lossRate += max(1.0 - float(len(linkInfo.delayList)) / linkInfo.packageNum, 0)
+                if len(linkInfo.delayList) != 0:
+                    DelayAvg += np.mean(linkInfo.delayList)
+                    DelayDev += np.std(linkInfo.delayList)
+        if n == 0:
+            return
+        linkUseFinal = np.mean(self.myTopo.linkUseRecord) 
+        nodeUseFinal = np.mean(self.myTopo.nodeUseRecord)
+        reward = a * float(DelayAvg) / n + b * float(DelayDev) / n + c * float(lossRate) / n
+        print(" reward: "  + str(reward) + " delayAvg: " + str(DelayAvg/n) + " delayStd: " + str(DelayDev/n) 
+                + " lossRate: " + str(lossRate/n) + " linkUse: " + str(np.mean(linkUseFinal)) + " nodeUse: " + str(np.mean(nodeUseFinal)))
 
     def samplePacketNum(self):
         '''
             采用双峰模型构建流量
         '''
         p = np.random.sample()
-        c1 = 4000
-        c2 = 5000
-        sigma = 1000
+        c1 = 5000
+        c2 = 3500
+        sigma = 600
         num = 0
         if p < 0.8:
             num = np.random.normal(c1, sigma, self.n * self.n)

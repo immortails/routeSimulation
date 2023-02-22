@@ -2,6 +2,8 @@
 import networkx as nx
 import numpy as np
 from route.rlagent.DQNagent import DQNagent
+from route.rlagent.D3QNAgent import D3QNagent
+from route.rlagent.DQNagentOld import DQNagentOld
 import random
 class route:
     topo = None                     
@@ -68,19 +70,22 @@ class DQRroute(route):
     def __init__(self, _topo=None, _arg = None) -> None:
         super().__init__(_topo, _arg)
         self.actionSpace = 4              #action space的空间大小
+        link_idx, node_idx = self.createLinkNodeConn(self.topo.nodeList, self.topo.edgeList)
+        link_idx_old = self.createLinkConnOld(self.topo.edgeList)
         self.modelArg = {
             'T' : 20,
             'link_state_dim': 25,
             'node_num': len(self.topo.nodeList),
             'edge_num': len(self.topo.edgeList),
-            'link_connection': self.createLinkConn(self.topo.edgeList),
+            'node_connection': node_idx,
+            'link_connection': link_idx_old,
             'feature_num': self.actionSpace,
         }
         self.agentArg = {
             'modelArg' : self.modelArg,
             'ifUpdate' : True,
             'actionSpace' : self.actionSpace,
-            'learnRate' : 0.00001,
+            'learnRate' : 0.0001,
             'expQueueLength': 1000,
             'beta': 0.5,
             'gamma': 0.95,
@@ -93,11 +98,33 @@ class DQRroute(route):
         for id1 in range(0, n):
             for id2 in range(0, n):
                 self.kspMap[id1][id2] = []      
-        self.agent = DQNagent(self.agentArg, self.topo, self.kspMap)   
+        #self.agent = DQNagent(self.agentArg, self.topo, self.kspMap) 
+        #self.agent = D3QNagent(self.agentArg, self.topo, self.kspMap)
+        self.agent = DQNagentOld(self.agentArg, self.topo, self.kspMap)  
 
-    def createLinkConn(self, edgeList):
+    def createLinkNodeConn(self, nodeList, edgeList):
         '''
-            创建mpnn按INDEX乘所需的矩阵
+            创建mpnn按link找node乘所需的矩阵
+        '''
+        n = len(nodeList)
+        m = len(edgeList)
+        nodeMat = np.zeros((n, m))
+        linkMat = np.zeros((m, n))
+        for ids, curEdge in edgeList.items():
+            curNode1 = curEdge.neighborNode[ids[0]]
+            curNode2 = curEdge.neighborNode[ids[1]]
+            linkMat[curEdge.id][curNode1.id] = 1
+            linkMat[curEdge.id][curNode2.id] = 1
+        for id, curNode in nodeList.items():
+            for ids, info in curNode.neighbor.items():
+                link = info[0]
+                nodeMat[curNode.id][link.id] = 1
+
+        return linkMat, nodeMat
+
+    def createLinkConnOld(self, edgeList):
+        '''
+            创建mpnn按INDEX乘所需的矩阵,老版本只有边的时候
         '''
         n = len(edgeList)
         linkMat = np.zeros((n, n))
@@ -113,7 +140,7 @@ class DQRroute(route):
                 neighborEdge = info[0]
                 if curEdge.id == neighborEdge.id:
                     continue
-                linkMat[curEdge.id][neighborEdge.id] = 1     
+                linkMat[curEdge.id][neighborEdge.id] = 1  
         return linkMat
 
     def setMap(self):
@@ -134,7 +161,7 @@ class DQRroute(route):
             for id2 in range(0, n):
                 if id1 == id2:
                     continue
-                kPaths = nx.all_shortest_paths(G, source = id1, target = id2)
+                kPaths = nx.shortest_simple_paths(G, source = id1, target = id2)
                 cnt = 0
                 for path in kPaths:
                     if cnt >= self.actionSpace:
